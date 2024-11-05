@@ -11,6 +11,7 @@ import sys
 from astropy.io import fits
 from glob import glob
 from optparse import OptionParser
+import runPL_library as runlib
 
 # Add options
 usage = """
@@ -47,6 +48,10 @@ parser.add_option("-c","--DATA-CAT", action="store",
                   help="DATA-CAT gives the level of reduction")
 parser.add_option("-t","--DATA-TYP", action="store", 
                   help="DATA-TYP gives the type of data")
+parser.add_option("-g","--GAIN", action="store", 
+                  help="")
+parser.add_option("-d","--DATE", action="store", 
+                  help="Use DEFAULT to get the date from the filename")
 
 (argoptions, args) = parser.parse_args()
 
@@ -65,7 +70,7 @@ else :
 filelist.sort() # process the files in alphabetical order
 
     
-if (argoptions.DATA_TYP!=None)|(argoptions.DATA_CAT!=None):
+if (argoptions.DATA_TYP!=None)|(argoptions.DATA_CAT!=None)|(argoptions.GAIN!=None)|(argoptions.DATE=="DEFAULT"):
     for filename in filelist:
         string_print=filename+"   ----->"
         with fits.open(filename, mode='update') as filehandle:
@@ -75,5 +80,12 @@ if (argoptions.DATA_TYP!=None)|(argoptions.DATA_CAT!=None):
             if argoptions.DATA_TYP:
                 filehandle[0].header['DATA-TYP'] = argoptions.DATA_TYP
                 string_print+='   DATA-TYP='+argoptions.DATA_TYP
+            if argoptions.GAIN:
+                filehandle[0].header['GAIN'] = argoptions.GAIN
+                string_print+='   GAIN='+argoptions.GAIN
+            if argoptions.DATE:
+                argoptions.DATE = runlib.get_date_from_filename(filename)
+                filehandle[0].header['DATE'] = argoptions.DATE
+                string_print+='   DATE='+argoptions.DATE
         print(string_print)
 

@@ -16,6 +16,7 @@ import numpy as np
 import peakutils
 import matplotlib.pyplot as plt
 from datetime import datetime
+import re
 
 def clean_filelist(fits_keywords, filelist, verbose=False):
     filelist_cleaned = []
@@ -32,7 +33,6 @@ def clean_filelist(fits_keywords, filelist, verbose=False):
 
         # Data files with the correct keywords only
         key_names = list(fits_keywords.keys())
-
         type_ok = True
         for strname in key_names:
             type_ok *= (strname in header)
@@ -88,7 +88,6 @@ def find_closest_in_time_dark(file, dark_files):
 def find_closest_dark(file, dark_files, filter_by_directory = False):
 
     cmap_dir = os.path.dirname(file)
-    
     dark_files = [dark for dark in dark_files if fits.getheader(dark)['GAIN'] == fits.getheader(file)['GAIN']]
     if len(dark_files) == 0:
         raise ValueError("No dark file available with correct gain to reduce file %s"%file)
@@ -120,3 +119,14 @@ def create_output_filename(header):
 
     output_filename = 'firstpl_' + date + '_' + name_extension + '.fits'
     return output_filename
+
+def get_date_from_filename(filename):
+    match = re.search(r"(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})", filename)
+    if match:
+        # Extract date and time parts
+        date_part = match.group(1)
+        time_part = match.group(2).replace('-', ':')  # Replace '-' with ':' for time
+        return f"{date_part}T{time_part}"
+    else:
+        return None  # Return None if no match is found
+

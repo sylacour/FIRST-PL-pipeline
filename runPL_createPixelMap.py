@@ -182,9 +182,17 @@ header['PIX_MAX'] = pixel_max
 header['PIX_WIDE'] = pixel_wide
 header['OUT_CHAN'] = output_channels
 
+# Définir le chemin complet du sous-dossier "output/wave"
+output_dir = os.path.join("output", "pixel")
+
+# Créer les dossiers "output" et "pixel" s'ils n'existent pas déjà
+os.makedirs(output_dir, exist_ok=True)
+
+
 hdu.header.extend(header, strip=True)
 hdul = fits.HDUList([hdu])
-filename_out = runlib.create_output_filename(header)
+filename_out = os.path.join(output_dir, runlib.create_output_filename(header))
+
 hdul.writeto(filename_out, overwrite=True)
 
 fig,ax=runlib.make_figure_of_trace(raw_image,traces_loc,pixel_wide,pixel_min,pixel_max)

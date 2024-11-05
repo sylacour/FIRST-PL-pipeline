@@ -62,8 +62,8 @@ parser.add_option("--pixel_map", type="string", default=None,
 
 
 if "VSCODE_PID" in os.environ:
-    filelist = glob("/Users/slacour/DATA/LANTERNE/Optim_maps/2024-09-18/2024-09-18_08-25-26_alfequ/*")
-    filelist = glob("/Users/slacour/DATA/LANTERNE/20240917/raw/*")
+    filelist = glob("/home/jsarrazin/Bureau/GIT/REPERTOIRES/FIRST-PL-pipeline/*")
+    filelist = glob("/home/jsarrazin/Bureau/PLDATA/InitData/*fits")
     filelist.sort()  # process the files in alphabetical order
 else:
     (options, args) = parser.parse_args()
@@ -81,7 +81,7 @@ else:
             if file.endswith(".fits"):
                 filelist.append(file)
 
-# print(filelist)
+#print(filelist)
 # Keys to keep only the RAW files
 fits_keywords = {'DATA-CAT': ['RAW']}
     
@@ -106,6 +106,8 @@ if pixel_map_file is not None:
 else:
     filelist_pixelmap = runlib.clean_filelist(fits_keywords, filelist)
 
+
+
 # raise an error if filelist_cleaned is empty
 if len(filelist_pixelmap) == 0:
     raise ValueError("No pixel map to pre-process")
@@ -126,24 +128,31 @@ traces_loc=fits.getdata(filelist_pixelmap[-1])
 # traces_loc+=5
 # Group files by their directories
 
+
 files_by_dir = defaultdict(list)
 for file in filelist_rawdata:
     dir_path = os.path.dirname(os.path.realpath(file))
     files_by_dir[dir_path].append(file)
 
+
 #%%
-# Process each directory separately
+# Process each directory separately 
 for dir_path, files in files_by_dir.items():
     raw_image = None
     center_image = None
     files_out = []
+    
     for file in tqdm(files[:], desc=f"Pre-processing of files in {dir_path}"):
+        print("\n")
+        print(file)
         data = fits.getdata(file)
         header = fits.getheader(file)
         object = header.get('OBJECT', "NONAME")
         date = header.get('DATE', 'NODATE')
         type = header.get('DATA-TYP',None)
         date_preproc = datetime.fromtimestamp(os.path.getctime(file)).strftime('%Y-%m-%dT%H:%M:%S')
+
+        header['GAIN'] = 1
 
         if date == 'NODATE':
             header['DATE'] = date_preproc
@@ -202,16 +211,16 @@ for dir_path, files in files_by_dir.items():
         comp_hdu.header['QC_BACKR'] = (perc_background[2]-perc_background[0])/2*np.sqrt(2)
         comp_hdu.header['QC_FLUX'] = flux_mean
         comp_hdu.header['DATA-CAT'] = "PREPROC"
-
         # create a directory named preproc if it does not exist
         preproc_dir_path = os.path.join(dir_path, "preproc")
         if not os.path.exists(preproc_dir_path):
             os.makedirs(preproc_dir_path)
-
-
+        
         output_filename = runlib.create_output_filename(header)
         files_out += [output_filename]
+        print(output_filename)
         comp_hdu.writeto(os.path.join(preproc_dir_path, output_filename), overwrite=True, output_verify='fix', checksum=True)
+        
 
     # copy filelist_pixelmap[-1] to the preproc directory
     shutil.copy(filelist_pixelmap[-1], preproc_dir_path)

@@ -69,6 +69,7 @@ if "VSCODE_PID" in os.environ:
     filelist = glob("/Users/slacour/DATA/LANTERNE/Optim_maps/2024-08-1[4-5]/*/preproc/*fits")
     filelist = glob("/Users/slacour/DATA/LANTERNE/Optim_maps/202*/*/preproc/*fits")
     filelist = glob("/Users/slacour/DATA/LANTERNE/Optim_maps/2024-05-02/*/preproc/*fits")
+    filelist = glob("/home/jsarrazin/Bureau/PLDATA/InitData/Neon1/preproc/*fits")
     cmap_size = 19
     # filelist = glob("/Users/slacour/DATA/LANTERNE/Optim_maps/firstpl/*")
     filelist.sort()  # process the files in alphabetical order
@@ -96,6 +97,9 @@ fits_keywords = {'DPR_CATG': ['PREPROC'],
                  'DPR_OPT': ['DARK']}
     
 # Use the function to clean the filelist
+print("\n")
+print(filelist)
+print("\n")
 filelist_dark = runlib.clean_filelist(fits_keywords, filelist)
 
 # raise an error if filelist_cleaned is empty
