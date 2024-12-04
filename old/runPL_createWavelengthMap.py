@@ -33,7 +33,7 @@ from scipy import linalg
 from matplotlib import animation
 from itertools import product
 #from scipy.linalg import pinvfind_closest_dark
-from best_match import BESTMATCH
+from runPL_calibrateNeon import its_a_match, run_trials_for_all_combination_of_waves
 
 plt.ion()
 
@@ -100,7 +100,7 @@ filelist_dark = runlib.clean_filelist(fits_keywords, filelist)
 # Keys to keep only the WAVE files
 fits_keywords = {'DATA-CAT': ['PREPROC'], 
                  'DATA-TYP': ['WAVE']}
-    
+
 # Use the function to clean the filelist
 filelist_wave = runlib.clean_filelist(fits_keywords, filelist)
 
@@ -127,7 +127,7 @@ data-=np.median(data_dark,axis=0)
 flux = data.mean(axis=(0,1))
 flux [flux<1] =1 
 
-threshold_array=np.linspace(0.001,0.3,300)
+threshold_array=np.linspace(0.01,0.3,100)
 wavelength_list = [float(w) for w in wave_list_string.strip('[]').split(',')]
 peaks_number=len(wavelength_list)
 solution_found=[]
@@ -146,9 +146,19 @@ for t in threshold_array:
 
 found = False
 detectedWavePeaks_solo = peakutils.peak.indexes(flux,threshold_array[0], min_dist=3)
+detectedWavePeaks_solo_list = detectedWavePeaks_solo.tolist()
+peak_weight = [1 for detectedPeak in detectedWavePeaks_solo_list]
+print(len(peak_weight))
+print(len(detectedWavePeaks_solo))
+
 for t in threshold_array:
     detectedWavePeaks_tmp = peakutils.peak.indexes(flux,thres=t, min_dist=3)
-    if len(detectedWavePeaks_tmp) == peaks_number: ####== peaks_number:
+
+    for detectedPeak in detectedWavePeaks_tmp:
+        index = detectedWavePeaks_solo_list.index(detectedPeak)
+        peak_weight[index]+=1 ##each detection will make the peak worth more
+
+    if len(detectedWavePeaks_tmp) == peaks_number: 
         detectedWavePeaks = detectedWavePeaks_tmp
         found = True
         break
@@ -156,12 +166,24 @@ for t in threshold_array:
 
 print("Wave list to match : ", wavelength_list)
 print("max de pics : ", detectedWavePeaks_solo)
+print("And respective weight : ", peak_weight)
 
 print("habituellement : ",detectedWavePeaks)
 
 
-detectedWavePeaks_new = BESTMATCH(wavelength_list, detectedWavePeaks_solo)
-print("avec best match : ",detectedWavePeaks_new)
+#detectedWavePeaks_new = BESTMATCH(wavelength_list, detectedWavePeaks_solo)
+its_a_match_peaks = its_a_match(detectedWavePeaks_solo_list, peak_weight, wavelength_list, 5)
+its_a_match_waves = wavelength_list
+# Somehow this actually works :
+#temp = run_trials_for_all_combination_of_waves(detectedWavePeaks_solo_list, peak_weight, wavelength_list,0,5)
+# its_a_match_peaks = temp[0]
+#its_a_match_waves = temp[1]
+
+# When off : 
+its_a_match_peaks = wavelength_list
+its_a_match_waves = wavelength_list
+
+print(" avec itsa match : ", its_a_match_peaks)
 ##########
 
 # Définir le chemin complet du sous-dossier "output/wave"
@@ -170,22 +192,14 @@ output_dir = os.path.join("output", "wave")
 
 
 
-fig,axs=plt.subplots(3,num="wavelength position",clear=True,figsize=(13,7))
+fig,axs=plt.subplots(2,num="wavelength position",clear=True,figsize=(13,7))
 
 axs[0].plot(flux)
 axs[0].plot(np.arange(len(flux))[detectedWavePeaks],flux[detectedWavePeaks],'o')
 axs[0].set_title("Peak detected position")
 axs[0].set_xlabel("Pixel number")
 axs[0].set_ylabel("Flux (ADU)")
-axs[0].set_yscale("log")
-
-# Create a plot with vertical lines at each detected wave peak
-axs[2].vlines(wavelength_list, ymin=0, ymax=1, color='red', linestyle='--')
-axs[2].set_title("wavelength to detect")
-axs[2].set_xlabel("Pixel number")
-axs[2].set_ylabel("Indicator (1D)")
-axs[2].set_yscale("linear")  # No need for a log scale since it's just an indicator plot
-axs[2].set_yticks([])        # Remove y-axis ticks for a cleaner 1D appearance
+axs[0].set_yscale("linear")
 
 if found == False:
     output_filename = runlib.create_output_filename(header)
@@ -195,40 +209,15 @@ if found == False:
 
 WavePoly=np.polyfit(detectedWavePeaks,wavelength_list,2)
 Wavefit=np.poly1d(WavePoly)
-
-###### exclusion de valeurs
-
-initial_poly = np.polyfit(detectedWavePeaks, wavelength_list, 2)
-initial_model = np.poly1d(initial_poly)
-detectedWavePeaks = np.array(detectedWavePeaks)
-wavelength_list = np.array(wavelength_list)
-
-
-# Étape 2 : Calcul des résidus
-y_pred = initial_model(detectedWavePeaks)
-residuals = np.abs(wavelength_list - y_pred)
-
-# Étape 3 : Identification des valeurs aberrantes (seuil basé sur l'écart-type)
-threshold = 10 * np.std(residuals)
-mask = residuals < threshold  # Crée un tableau booléen
-
-# Étape 4 : Filtrer les valeurs aberrantes en appliquant le masque aux données d'origine
-detectedWavePeaks_filtered = detectedWavePeaks[mask]
-wavelength_list_filtered = wavelength_list[mask]
-
-# Ajustement du modèle final sans les valeurs aberrantes
-filtered_poly = np.polyfit(detectedWavePeaks_filtered, wavelength_list_filtered, 2)
-final_model = np.poly1d(filtered_poly)
-
-######
-
+print("Old : ")
+print(WavePoly)
 
 
 
 
 pixels=np.arange(flux.shape[0])
-pix_to_wavelength_map=final_model(pixels)
-#pix_to_wavelength_map=Wavefit(pixels)
+#pix_to_wavelength_map=final_model(pixels)
+pix_to_wavelength_map=Wavefit(pixels)
 # Créer les dossiers "output" et "wave" s'ils n'existent pas déjà
 os.makedirs(output_dir, exist_ok=True)
 # Save fits file with traces_loc inside
@@ -256,25 +245,24 @@ fig.tight_layout()
 fig.savefig(output_filename[:-4]+"png",dpi=300)
 
 
-fig2,axs2=plt.subplots(3,num="wavelength position",clear=True,figsize=(13,7))
+fig2,axs2=plt.subplots(2,num="wavelength position",clear=True,figsize=(13,7))
 
 axs2[0].plot(flux)
-axs2[0].plot(np.arange(len(flux))[detectedWavePeaks_new],flux[detectedWavePeaks_new],'o')
+axs2[0].plot(np.arange(len(flux))[its_a_match_peaks],flux[its_a_match_peaks],'o')
 axs2[0].set_title("Peak detected new match")
 axs2[0].set_xlabel("Pixel number")
 axs2[0].set_ylabel("Flux (ADU)")
-axs2[0].set_yscale("log")
+axs2[0].set_yscale("linear")
 
-# Create a plot with vertical lines at each detected wave peak
-axs2[2].vlines(wavelength_list, ymin=0, ymax=1, color='red', linestyle='--')
-axs2[2].set_title("wavelength to detect")
-axs2[2].set_xlabel("Pixel number")
-axs2[2].set_ylabel("Indicator (1D)")
-axs2[2].set_yscale("linear")  # No need for a log scale since it's just an indicator plot
-axs2[2].set_yticks([])        # Remove y-axis ticks for a cleaner 1D appearance
 
-axs2[1].plot(pixels,pix_to_wavelength_map,label='Polynomial fit (deg={})'.format(2))
-axs2[1].plot(detectedWavePeaks_new,wavelength_list,'o',label='Detected peaks')
+WavePolyBest=np.polyfit(its_a_match_peaks,its_a_match_waves,2)
+WavefitBest=np.poly1d(WavePolyBest)
+print("Best match : ")
+print(WavePolyBest)
+pix_to_wavelength_map_best=WavefitBest(pixels)
+
+axs2[1].plot(pixels,pix_to_wavelength_map_best,label='Polynomial fit (deg={})'.format(2))
+axs2[1].plot(its_a_match_peaks,its_a_match_waves,'o',label='Detected peaks')
 axs2[1].set_title("Wavelength vrs Pixels new")
 axs2[1].set_xlabel("Pixel number")
 axs2[1].set_ylabel("Wavelength (nm)")
@@ -292,7 +280,7 @@ axs3[0].plot(np.arange(len(flux))[detectedWavePeaks_solo],flux[detectedWavePeaks
 axs3[0].set_title("Peak detected new match")
 axs3[0].set_xlabel("Pixel number")
 axs3[0].set_ylabel("Flux (ADU)")
-axs3[0].set_yscale("log")
+axs3[0].set_yscale("linear")
 
 # Create a plot with vertical lines at each detected wave peak
 axs3[1].vlines(wavelength_list, ymin=0, ymax=1, color='red', linestyle='--')

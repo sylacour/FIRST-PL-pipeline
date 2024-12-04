@@ -129,4 +129,16 @@ def get_date_from_filename(filename):
         return f"{date_part}T{time_part}"
     else:
         return None  # Return None if no match is found
+    
+def latest_file(filelist):
+
+    if filelist==[]:
+        return None  # Return None if no valid files are found
+    
+    # Find the file with the most recent creation time
+    last_created_file = max(filelist, key=os.path.getctime)
+    
+    return last_created_file
+
+
 
