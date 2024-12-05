@@ -56,6 +56,7 @@ usage = """
 
 def get_filelist(folder, pixel_map_file):
     filelist = []
+    print(folder)
     for file in os.listdir(folder):
         if file.endswith(".fits"):
             filelist.append(os.path.join(folder,file))
@@ -75,9 +76,12 @@ def get_filelist(folder, pixel_map_file):
         
     # Use the function to clean the filelist
     pixelmaps_list = []
-    for file in os.listdir(pixel_map_file):
-        if file.endswith(".fits"):
-            pixelmaps_list.append(os.path.join(pixel_map_file,file))
+    if isinstance(pixel_map_file, list):
+        for file in os.listdir(pixel_map_file):
+            if file.endswith(".fits"):
+                pixelmaps_list.append(os.path.join(pixel_map_file,file))
+    else: 
+        pixelmaps_list.append(pixel_map_file)
     pixel_map_file = runlib.latest_file(pixelmaps_list)
 
     filelist_pixelmap = runlib.clean_filelist(fits_keywords, [pixel_map_file])
@@ -238,18 +242,13 @@ if __name__ == "__main__":
     # Default values
     folder ="."
 
-    if debug :
-        folder ="/home/jsarrazin/Bureau/PLDATA/InitData/Neon2"
-    pixel_map_file = folder + "/output/pixelmaps"
-    
-    if not debug:
-        # Add options for these values
-        parser.add_option("--pixel_map", type="string", default=None,
-                        help="Force to select which pixel map file to use (default: the one in the directory)")
+    # Add options for these values
+    parser.add_option("--pixel_map", type="string", default=None,
+                    help="Force to select which pixel map file to use (default: the one in the directory)")
 
-        (options, args) = parser.parse_args()
-        pixel_map_file = options.pixel_map
-        folder = args
+    (options, args) = parser.parse_args()
+    pixel_map_file = options.pixel_map
+    folder = args[0] if args else folder
 
     filelist_pixelmap,files_by_dir = get_filelist(folder, pixel_map_file)
     preprocess(filelist_pixelmap,files_by_dir)

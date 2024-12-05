@@ -22,4 +22,72 @@ from runPL_preprocess import run_preprocess
 #     hdul.flush()  # Explicitly write changes to disk (optional)
 
 #run_createPixelMap(folder="/home/jsarrazin/Bureau/PLDATA/InitData/Neon2")
-run_preprocess(folder="/home/jsarrazin/Bureau/PLDATA/InitData/Neon2")
+#run_preprocess(folder="/home/jsarrazin/Bureau/PLDATA/InitData/Neon2")
+
+
+def update_gain_in_fits(folder_path):
+    """
+    Updates the GAIN value in the header of all .fits files in a specified folder.
+
+    Parameters:
+        folder_path (str): Path to the folder containing .fits files.
+    """
+    # Iterate over all files in the folder
+    for file_name in os.listdir(folder_path):
+        # Check if the file has a .fits extension
+        if file_name.lower().endswith(".fits"):
+            file_path = os.path.join(folder_path, file_name)
+            
+            try:
+                # Open the FITS file
+                with fits.open(file_path, mode='update') as hdul:
+                    # Access the primary header
+                    hdr = hdul[0].header
+                    
+                    # Update the GAIN value
+                    hdr['GAIN'] = 1
+                    
+                    # Save the changes
+                    hdul.flush()
+                    print(f"Updated GAIN in {file_name}")
+            except Exception as e:
+                print(f"Failed to update {file_name}: {e}")
+
+# Example usage
+folder = "/home/jsarrazin/Bureau/PLDATA/InitData"
+
+def update_date_in_fits(folder_path):
+    """
+    Updates the DATE value in the header of all .fits files based on the date in their file names.
+
+    Parameters:
+        folder_path (str): Path to the folder containing .fits files.
+    """
+    for file_name in os.listdir(folder_path):
+        if file_name.lower().endswith(".fits"):
+            # Extract the date and time from the file name
+            try:
+                # File name format: im_cube_2024-08-18_11-01-23_altair.fits
+                parts = file_name.split("_")
+                date_part = parts[2]  # "2024-08-18"
+                time_part = parts[3]  # "11-01-23"
+                time_part = time_part.split(".")[0]  # Remove ".fits" or extra extensions
+                
+                # Format as '2024-08-18T11:01:23'
+                formatted_date = f"{date_part}T{time_part.replace('-', ':')}"
+                
+                # Full file path
+                file_path = os.path.join(folder_path, file_name)
+                
+                # Update the DATE keyword in the header
+                with fits.open(file_path, mode='update') as hdul:
+                    hdr = hdul[0].header
+                    hdr['DATE'] = formatted_date
+                    hdul.flush()
+                    print(f"Updated DATE in {file_name} to {formatted_date}")
+            
+            except Exception as e:
+                print(f"Failed to update DATE in {file_name}: {e}")
+
+# Example usage
+update_date_in_fits(folder)

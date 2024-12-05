@@ -229,13 +229,20 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     # Pass the parsed options to the function
+    folder=options.folder,
+    pixel_min=options.pixel_min,
+    pixel_max=options.pixel_max,
+    pixel_wide=options.pixel_wide,
+    output_channels=options.output_channels,
+    file_patterns=args if args else None
+    
     filelist = process_files(
-        folder=options.folder,
-        pixel_min=options.pixel_min,
-        pixel_max=options.pixel_max,
-        pixel_wide=options.pixel_wide,
-        output_channels=options.output_channels,
-        file_patterns=args if args else None
+        folder,
+        pixel_min,
+        pixel_max,
+        pixel_wide,
+        output_channels,
+        file_patterns
     )
     raw_Image, header = raw_image_clean(filelist)
     traces_loc, x_found,y_found = generate_pixelmap(raw_Image, pixel_min, pixel_max, output_channels)
