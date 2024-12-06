@@ -122,14 +122,15 @@ if __name__ == "__main__":
     All results will be saved in this folder.
     
     '''
-    neon1 = "/home/jsarrazin/Bureau/PLDATA/InitData/Neon1/*fits"
-    neon2 = "/home/jsarrazin/Bureau/PLDATA/InitData/Neon2/*fits"
-    neon3 = "/home/jsarrazin/Bureau/PLDATA/InitData/Neon3/*fits"
+    neon1 = "/home/jsarrazin/Bureau/PLDATA/InitData/Neon1/"
+    neon2 = "/home/jsarrazin/Bureau/PLDATA/InitData/Neon2/"
+    neon3 = "/home/jsarrazin/Bureau/PLDATA/InitData/Neon3/"
+    neon4 = "/home/jsarrazin/Bureau/PLDATA/InitData/Neon4/"
     lesautres = "/home/jsarrazin/Bureau/PLDATA/InitData/"
     onestar ="/home/jsarrazin/Bureau/PLDATA/InitData/im_cube_2024-08-18_11-01-23_altair/"
 
     #Change whereFiles accordingly
-    whereFiles = neon2
+    whereFiles = neon4
 
     # à la main avec neon1 :
     wavelist = "[748.9, 724.5, 703.2, 693, 671.7, 667.8, 659.9, 653.3, 650.7, 640.2, 638.2, 633.4, 626.7]"

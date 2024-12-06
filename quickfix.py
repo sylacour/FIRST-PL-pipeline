@@ -89,5 +89,46 @@ def update_date_in_fits(folder_path):
             except Exception as e:
                 print(f"Failed to update DATE in {file_name}: {e}")
 
-# Example usage
-update_date_in_fits(folder)
+
+
+def update_header_value(file, which_header, what_value):
+    """
+    Updates the GAIN value in the header of all .fits files in a specified folder.
+
+    Parameters:
+        folder_path (str): Path to the folder containing .fits files.
+    """
+    # Check if the file has a .fits extensio
+    try:
+        # Open the FITS file
+        with fits.open(file, mode='update') as hdul:
+            # Access the primary header
+            hdr = hdul[0].header
+            
+            # Update the GAIN value
+            hdr[which_header] = what_value
+            
+            # Save the changes
+            hdul.flush()
+            print(f"Updated {which_header} to {what_value} in {file}")
+    except Exception as e:
+        print(f"Failed to update {file}: {e}")
+
+update_header_value("/home/jsarrazin/Bureau/PLDATA/InitData/Neon4/firstpl_00:57:11.727002706.fits", "DATA-CAT", "RAW")
+update_header_value("/home/jsarrazin/Bureau/PLDATA/InitData/Neon4/firstpl_00:59:38.528185978.fits", "DATA-CAT", "RAW")
+update_header_value("/home/jsarrazin/Bureau/PLDATA/InitData/Neon4/firstpl_00:57:11.727002706.fits", "DATA-TYP", "WAVE")
+update_header_value("/home/jsarrazin/Bureau/PLDATA/InitData/Neon4/firstpl_00:59:38.528185978.fits", "DATA-TYP", "DARK")
+
+
+'''
+    fits_keywords = {'DATA-CAT': ['PREPROC'], 
+                    'DATA-TYP': ['DARK']}
+
+    fits_keywords = {'DATA-CAT': ['PREPROC'], 
+                    'DATA-TYP': ['WAVE']}
+
+        fits_keywords = {'DATA-CAT': ['PREPROC'], 
+                        'DATA-TYP': ['OBJECT']}
+
+
+'''

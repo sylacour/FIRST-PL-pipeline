@@ -329,12 +329,12 @@ def figure4(flux, pix_to_wavelength_map_best,its_a_match_peaks,its_a_match_waves
     detected_wavelengths = pix_to_wavelength_map_best[its_a_match_peaks]
 
     # Top plot: Flux vs. Wavelength
-    axs4[0].plot(wavelengths, flux)  # Use wavelengths instead of pixel numbers
-    axs4[0].plot(detected_wavelengths, flux[its_a_match_peaks], 'o')  # Detected peaks in wavelength space
+    axs4.plot(wavelengths, flux)  # Use wavelengths instead of pixel numbers
+    axs4.plot(detected_wavelengths, flux[its_a_match_peaks], 'o')  # Detected peaks in wavelength space
 
     # Annotate each detected peak with its wavelength value
     for wavelength, flux_value in zip(detected_wavelengths, flux[its_a_match_peaks]):
-        axs4[0].annotate(
+        axs4.annotate(
             f'{wavelength:.1f} nm',  # Label text showing wavelength rounded to 1 decimal
             xy=(wavelength, flux_value),  # Position of the annotation
             xytext=(0, 10),  # Offset position (0 pixels right, 10 pixels up)
@@ -344,10 +344,10 @@ def figure4(flux, pix_to_wavelength_map_best,its_a_match_peaks,its_a_match_waves
             color='black'
         )
 
-    axs4[0].set_title("Peak detected new match")
-    axs4[0].set_xlabel("Wavelength (nm)")  # Update label
-    axs4[0].set_ylabel("Flux (ADU)")
-    axs4[0].set_yscale("linear")
+    axs4.set_title("Peak detected new match")
+    axs4.set_xlabel("Wavelength (nm)")  # Update label
+    axs4.set_ylabel("Flux (ADU)")
+    axs4.set_yscale("linear")
 
     fig4.tight_layout()
 

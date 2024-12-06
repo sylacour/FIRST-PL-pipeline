@@ -64,6 +64,8 @@ def process_files(folder=".",pixel_min=100, pixel_max=1600, pixel_wide=3, output
         list: A list of files to process.
     """
     filelist = []
+    if folder.endswith("*fits"):
+        folder = folder[:-5]
 
     # If file patterns are provided, use glob to find matching files
     for pattern in file_patterns:
@@ -101,7 +103,7 @@ def generate_pixelmap(raw_image, pixel_min, pixel_max, output_channels):
     sampling        = np.linspace(pixel_min+5,pixel_max-5,300,dtype=int)
     peaks           = np.zeros([output_channels, sampling.shape[0]])
 
-    threshold_array=np.linspace(0.01,0.1,50)
+    threshold_array=np.linspace(0.01,0.1,50) #originally #np.linspace(0.01,0.1,50) 
     peaks_number=output_channels
     solution_found=[]
     for i in (range(sampling.shape[0])):
@@ -109,7 +111,7 @@ def generate_pixelmap(raw_image, pixel_min, pixel_max, output_channels):
         detectedWavePeaks=np.zeros(output_channels)
         found = False
         for t in threshold_array:
-            detectedWavePeaks_tmp = peakutils.peak.indexes(sum_image,thres=t, min_dist=6)
+            detectedWavePeaks_tmp = peakutils.peak.indexes(sum_image,thres=t, min_dist=5)
             if len(detectedWavePeaks_tmp) == peaks_number:
                 detectedWavePeaks = detectedWavePeaks_tmp
                 found = True
@@ -137,7 +139,7 @@ def generate_pixelmap(raw_image, pixel_min, pixel_max, output_channels):
             std_residuals = np.std(residuals)
 
             # Identify inliers (points with residuals within the threshold)
-            inliers = np.abs(residuals) < 3 * std_residuals
+            inliers = np.abs(residuals) < 4 * std_residuals
 
             # Remove outliers
             x = x[inliers]
@@ -170,6 +172,8 @@ def save_fits_and_png(raw_image,traces_loc, header, x_found,y_found, pixel_min, 
     header['OUT_CHAN'] = output_channels
 
     # Définir le chemin complet du sous-dossier "output/wave"
+    if folder.endswith("*fits"):
+        folder = folder[:-5]
     output_dir = os.path.join(folder,"pixelmaps")
 
     if os.path.exists(output_dir) and os.path.isdir(output_dir):

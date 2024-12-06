@@ -56,10 +56,11 @@ usage = """
 
 def get_filelist(folder, pixel_map_file):
     filelist = []
-    print(folder)
+    if folder.endswith("*fits"):
+        folder = folder[:-5]
     for file in os.listdir(folder):
         if file.endswith(".fits"):
-            filelist.append(os.path.join(folder,file))
+            filelist.append(os.path.join(folder, file))
 
     # Keys to keep only the RAW files
     fits_keywords = {'DATA-CAT': ['RAW']}
@@ -76,12 +77,13 @@ def get_filelist(folder, pixel_map_file):
         
     # Use the function to clean the filelist
     pixelmaps_list = []
-    if isinstance(pixel_map_file, list):
+    if os.path.isfile(pixel_map_file):
+        pixelmaps_list.append(pixel_map_file)
+    else:
         for file in os.listdir(pixel_map_file):
             if file.endswith(".fits"):
                 pixelmaps_list.append(os.path.join(pixel_map_file,file))
-    else: 
-        pixelmaps_list.append(pixel_map_file)
+
     pixel_map_file = runlib.latest_file(pixelmaps_list)
 
     filelist_pixelmap = runlib.clean_filelist(fits_keywords, [pixel_map_file])
@@ -229,6 +231,8 @@ def preprocess(filelist_pixelmap,files_by_dir):
 
 def run_preprocess(folder = ".",pixel_map_file = None):
     # Default values
+    if folder.endswith("*fits"):
+        folder = folder[:-5]
     if pixel_map_file==None :
         pixel_map_file = folder + "pixelmaps"
     
