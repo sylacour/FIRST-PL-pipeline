@@ -77,16 +77,14 @@ def get_filelist(folder, pixel_map_file):
         
     # Use the function to clean the filelist
     pixelmaps_list = []
-<<<<<<< HEAD
+
     if os.path.isfile(pixel_map_file):
         pixelmaps_list.append(pixel_map_file)
     else:
-=======
-    if not pixel_map_file.endswith(".fits"):
->>>>>>> 58a73ba (Fixes and wip)
-        for file in os.listdir(pixel_map_file):
-            if file.endswith(".fits"):
-                pixelmaps_list.append(os.path.join(pixel_map_file,file))
+        if not pixel_map_file.endswith(".fits"):
+            for file in os.listdir(pixel_map_file):
+                if file.endswith(".fits"):
+                    pixelmaps_list.append(os.path.join(pixel_map_file,file))
 
     pixel_map_file = runlib.latest_file(pixelmaps_list)
 
