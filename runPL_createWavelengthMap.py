@@ -140,7 +140,6 @@ def prep_data(filelist, star=False):
 
     # Use the function to clean the filelist
     filelist_wave = runlib.clean_filelist(fits_keywords, filelist)
-    print(filelist)
 
     # raise an error if data is not suitable
     if len(filelist_wave) == 0:

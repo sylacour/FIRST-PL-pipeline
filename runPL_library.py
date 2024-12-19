@@ -140,5 +140,93 @@ def latest_file(filelist):
     
     return last_created_file
 
+def get_fits_date(fits_file):
+    try:
+        with fits.open(fits_file) as hdul:
+            header = hdul[0].header
+            date_str = header.get('DATE', None)
+            
+            if date_str:
+                # Parse the DATE value
+                file_date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S")
+    except Exception as e:
+        print(f"Error reading file {fits_file}: {e}")
+    return file_date
 
+def get_latest_date_fits(fits_files):
+    """
+    Finds the FITS file with the latest 'DATE' value in its header.
 
+    Parameters:
+        fits_files (list): A list of paths to FITS files.
+
+    Returns:
+        str: The path to the FITS file with the latest 'DATE' value.
+        None: If no valid 'DATE' values are found in the files.
+    """
+    latest_file = None
+    latest_date = None
+    
+    for file in fits_files:
+        try:
+            with fits.open(file) as hdul:
+                header = hdul[0].header
+                date_str = header.get('DATE', None)
+                
+                if date_str:
+                    # Parse the DATE value
+                    file_date = datetime.strptime(date_str, "%Y-%m-%dT%H:%M:%S")
+                    
+                    # Update the latest file if this file has a newer date
+                    if latest_date is None or file_date > latest_date:
+                        latest_date = file_date
+                        latest_file = file
+        except Exception as e:
+            print(f"Error reading file {file}: {e}")
+    
+    return latest_file
+
+def get_all_fits_files(folder):
+    """
+    Recursively finds all FITS files in a given folder and its subfolders.
+
+    Parameters:
+        folder (str): The path to the folder to search.
+
+    Returns:
+        list: A list of paths to all FITS files in the folder and its subfolders.
+    """
+    fits_files = []
+    for root, _, files in os.walk(folder):
+        for file in files:
+            if file.lower().endswith('.fits'):
+                fits_files.append(os.path.join(root, file))
+    return fits_files
+
+def update_anything_in_fits(file_path, header, header_value):
+    # Update the chosen keyword 
+    with fits.open(file_path, mode='update') as hdul:
+        hdr = hdul[0].header
+        hdr[header] = header_value
+        hdul.flush()
+        print(f"Updated {header} in {file_path} to {header_value}")
+
+def update_anything_in_multiple_fits(folder_path, header, header_value):
+    """
+    Updates the chosen value in the header of all .fits files in a specified folder.
+
+    Parameters:
+        folder_path (str): Path to the folder containing .fits files.
+    """
+    # Iterate over all files in the folder
+    for file_name in os.listdir(folder_path):
+        # Check if the file has a .fits extension
+        if file_name.lower().endswith(".fits"):
+            file_path = os.path.join(folder_path, file_name)
+            
+            try:
+                # Open the FITS file
+                with fits.open(file_path, mode='update') as hdul:
+                    update_anything_in_fits(file_path, header, header_value)
+            except Exception as e:
+                print(f"Failed to update {file_name}: {e}")

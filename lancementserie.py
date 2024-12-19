@@ -46,9 +46,20 @@ def NeonCalibration(whereFiles, wavelist, allYesInput =False):
         output = runCreateWavelengthMap(whereFiles+"preproc/", wavelist, saveWhere=whereFiles+"calibration_result/")
         np.savetxt("WavePolyBest.txt", output)
         print("Best polyfit output saved : "+os.path.abspath("WavePolyBest.txt"))
-
+        saveTXT_wavelength_pixel(output, whereFiles+"calibration_result/", "pixels_to_wavelength.txt")
 
     return True
+
+def saveTXT_wavelength_pixel(wavePoly, whereToSave, filename):
+    bestFit = np.poly1d(wavePoly)
+    pixels = np.arange(0, 5001) 
+    wavelengths = bestFit(pixels)
+
+    data = np.column_stack((pixels, wavelengths))
+    np.savetxt(os.path.join(whereToSave,filename), data, fmt="%.6f", header="Pixels Wavelengths", comments="")
+    
+
+
 
 def getPoly_from_txt():
     file_name="WavePolyBest.txt"

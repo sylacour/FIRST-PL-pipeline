@@ -78,6 +78,10 @@ def process_files(folder=".",pixel_min=100, pixel_max=1600, pixel_wide=3, output
 
 
 def raw_image_clean(filelist):
+        '''
+        Process all raw files and sum them into one image
+        By summing all cubes into one picture 
+        '''
 
         # Keys to keep only the RAW files
         fits_keywords = {'DATA-CAT': ['RAW']}
@@ -100,38 +104,50 @@ def raw_image_clean(filelist):
 def generate_pixelmap(raw_image, pixel_min, pixel_max, output_channels):
     pixel_length=raw_image.shape[1]
 
+    #300 values of pixels between pixelmin and pixelmax
     sampling        = np.linspace(pixel_min+5,pixel_max-5,300,dtype=int)
     peaks           = np.zeros([output_channels, sampling.shape[0]])
 
     threshold_array=np.linspace(0.01,0.1,50) #originally #np.linspace(0.01,0.1,50) 
     peaks_number=output_channels
     solution_found=[]
-    for i in (range(sampling.shape[0])):
+    for i in (range(sampling.shape[0])): #from 0 to the number of samples
+        #Sum 10 values of x (wavelenght=columns) of the pic
         sum_image = raw_image[:,sampling[i]-5:sampling[i]+5].sum(axis=1)
         detectedWavePeaks=np.zeros(output_channels)
         found = False
+        #Search for the 38 modes expected
         for t in threshold_array:
-            detectedWavePeaks_tmp = peakutils.peak.indexes(sum_image,thres=t, min_dist=5)
+            detectedWavePeaks_tmp = peakutils.peak.indexes(sum_image,thres=t, min_dist=6)
             if len(detectedWavePeaks_tmp) == peaks_number:
                 detectedWavePeaks = detectedWavePeaks_tmp
                 found = True
                 break
         solution_found+=[found]
+        #The values will be saved at the index i of the sample
         peaks[:,i]=detectedWavePeaks
 
     traces_loc= np.ones([pixel_length,output_channels],dtype=int)
 
     x_found=[]
     y_found=[]
+    x_none = []
+    y_none = []
+
+    #Once we've picked each detected peak, we need to verify that they all belong to the same mode,
+    #and that there is no outlier
 
     for i in range(output_channels):
+        # x is a list of all the pixels/wavelength at which 38 peaks were detected
         x = sampling[solution_found]
+        # y the corresponding positions of each peak/mode
         y = peaks[i][solution_found]
 
-        for b in range(5):
+        # To check for outlier, we make a 1D polyfit between x and y
+        for b in range(5): # The process is repeated 5 times to refine the polyfit each time
             poly_coeffs = np.polyfit(x, y, 1)
 
-            # Calculate residuals
+            # Calculate residuals of the function
             y_fit = np.polyval(poly_coeffs, x)
             residuals = y - y_fit
 
@@ -139,21 +155,55 @@ def generate_pixelmap(raw_image, pixel_min, pixel_max, output_channels):
             std_residuals = np.std(residuals)
 
             # Identify inliers (points with residuals within the threshold)
-            inliers = np.abs(residuals) < 4 * std_residuals
+            inliers = np.abs(residuals) < 3 * std_residuals
 
             # Remove outliers
             x = x[inliers]
             y = y[inliers]
 
+            # Replace outliers with None
+            x_with_none = [xi if inlier else None for xi, inlier in zip(x, inliers)]
+            y_with_none = [yi if inlier else None for yi, inlier in zip(y, inliers)]
+
         # Fit the polynomial to the cleaned data
         poly_coeffs = np.polyfit(x, y, 1)
-
+        # We stop considering solo pixels and consider the 1D polyfit to trace over all of them.
         traces_loc[:,i] = np.polyval(poly_coeffs, np.arange(pixel_length))+0.5
-
+        # x is a list of all the pixels/wavelength at which 38 peaks were detected
+        # y the corresponding positions of each peak/mode
         x_found += [x]
         y_found += [y]
+        x_none +=[x_with_none]
+        y_none +=[y_with_none]
 
-    return traces_loc, x_found,y_found
+    return traces_loc, x_found,y_found, x_none, y_none
+
+
+def checking_wavelength_aligment_in_modes(x_none, y_none):
+    matplotlib.use('TkAgg')
+    fig, ax = plt.subplots()
+
+    # Find the maximum number of columns
+    max_columns = max(len(row) for row in x_none)
+
+    # Iterate over each column index
+    for j in range(max_columns):
+        x_vals = []
+        y_vals = []
+        for i in range(len(x_none)):  # Loop through rows (modes)
+            if j < len(x_none[i]) and y_none[i][j] is not None:  # Ensure valid x and y
+                x_vals.append(x_none[i][j])
+                y_vals.append(y_none[i][j])
+        if len(x_vals) > 1:  # Plot only if there's at least two points to connect
+            ax.plot(x_vals, y_vals, marker='o', label=f'Column {j+1}')
+
+    # Add a legend and labels
+    ax.legend()
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_title("Plots Across Y Columns (Handling Missing Values)")
+    plt.show()
+    print("buffer")
 
 def save_fits_and_png(raw_image,traces_loc, header, x_found,y_found, pixel_min, pixel_max,pixel_wide,output_channels, folder):
     # Save fits file with traces_loc inside
@@ -189,8 +239,37 @@ def save_fits_and_png(raw_image,traces_loc, header, x_found,y_found, pixel_min, 
     hdul.writeto(filename_out, overwrite=True)
 
     fig,ax=runlib.make_figure_of_trace(raw_image,traces_loc,pixel_wide,pixel_min,pixel_max)
-    for i in range(output_channels):
-        ax.plot(x_found[i],y_found[i],'w-',linewidth=0.5)
+
+    
+    annotation = True
+    y_trace = True
+    if not y_trace :
+        for i in range(output_channels):
+            ax.plot(x_found[i],y_found[i],'w-',linewidth=0.5)
+            if annotation :
+                # Annotate each point
+                for j, (x, y) in enumerate(zip(x_found[i], y_found[i])):
+                    offset = (5, -5) if j % 2 == 0 else (-5, 5)  # Alternate offsets
+                    ax.annotate(f'({x}, {y})', xy=(x, y), xytext=offset, textcoords='offset points', 
+                                fontsize=6, color='white')
+    
+    
+    if y_trace:
+        max_columns = max(len(row) for row in x_found)
+
+        # Iterate over each column index
+        for j in range(max_columns):
+            x_vals = []
+            y_vals = []
+            for i in range(len(x_found)):  # Loop through rows (modes)
+                if j < len(x_found[i]):  # Ensure the column exists in the current row
+                    x_vals.append(x_found[i][j])
+                    y_vals.append(y_found[i][j])
+            if x_vals and y_vals:  # Check if there is data to plot
+                ax.plot(x_vals, y_vals, marker='o', label=f'Column {j+1}')
+
+
+    ax.legend()
 
     fig.savefig(filename_out[:-4]+"png",dpi=300)
 
@@ -201,7 +280,8 @@ def save_fits_and_png(raw_image,traces_loc, header, x_found,y_found, pixel_min, 
 def run_createPixelMap(folder, destination, pixel_min=100, pixel_max=1600, pixel_wide=3, output_channels=38, file_patterns=["*.fits"]):
     filelist = process_files(folder, pixel_min, pixel_max,pixel_wide,output_channels,file_patterns)
     raw_Image, header = raw_image_clean(filelist)
-    traces_loc, x_found,y_found = generate_pixelmap(raw_Image, pixel_min, pixel_max, output_channels)
+    traces_loc, x_found,y_found, x_none, y_none = generate_pixelmap(raw_Image, pixel_min, pixel_max, output_channels)
+    #checking_wavelength_aligment_in_modes(x_none, y_none) # TESTING ONLY, TO REMOVE
     save_fits_and_png(raw_Image, traces_loc, header, x_found,y_found, pixel_min, pixel_max,pixel_wide,output_channels, folder)
     save_fits_and_png(raw_Image,traces_loc, header, x_found,y_found, pixel_min, pixel_max,pixel_wide,output_channels, destination)
 
