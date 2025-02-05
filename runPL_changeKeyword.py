@@ -60,7 +60,7 @@ filelist=[]
 ## If the user specifies a file name or wild cards ("*_0001.fits")
 if len(args) > 0 :
     for f in args:
-        filelist += glob(f)
+        filelist += [file for file in glob(f) if file.endswith(".fits")]
 ## Processing of the full current directory
 else :
     for file in os.listdir("."):
