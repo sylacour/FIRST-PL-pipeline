@@ -49,7 +49,7 @@ usage = """
 """
 
 
-def process_files(folder=".",pixel_min=100, pixel_max=1600, pixel_wide=3, output_channels=38, file_patterns=["*.fits"]):
+def process_files(folder=".", file_patterns=["*.fits"]):
     """
     Processes files based on the given parameters.
 
@@ -218,8 +218,6 @@ if __name__ == "__main__":
     folder = "."  # Default to current directory
 
     # Add options for these values
-    parser.add_option("--folder", type="str", default=folder,
-                      help="Folder to look for files (default: %default)")
     parser.add_option("--pixel_min", type="int", default=pixel_min,
                     help="Minimum pixel value (default: %default)")
     parser.add_option("--pixel_max", type="int", default=pixel_max,
@@ -233,21 +231,14 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     # Pass the parsed options to the function
-    folder=options.folder,
-    pixel_min=options.pixel_min,
-    pixel_max=options.pixel_max,
-    pixel_wide=options.pixel_wide,
-    output_channels=options.output_channels,
-    file_patterns=args if args else None
+    pixel_min=options.pixel_min
+    pixel_max=options.pixel_max
+    pixel_wide=options.pixel_wide
+    output_channels=options.output_channels
+    file_patterns=args if args else ['*.fits']
     
-    filelist = process_files(
-        folder,
-        pixel_min,
-        pixel_max,
-        pixel_wide,
-        output_channels,
-        file_patterns
-    )
+    filelist=runlib.get_filelist( file_patterns )
+
     raw_Image, header = raw_image_clean(filelist)
     traces_loc, x_found,y_found = generate_pixelmap(raw_Image, pixel_min, pixel_max, output_channels)
     save_fits_and_png(raw_Image, traces_loc, header, x_found,y_found, pixel_min, pixel_max,pixel_wide,output_channels, folder)

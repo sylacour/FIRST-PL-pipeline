@@ -140,5 +140,36 @@ def latest_file(filelist):
     
     return last_created_file
 
+def get_filelist(file_patterns=["*.fits"]):
+    """
+    Find files based on the given parameters.
 
+    Args:
+        file_patterns (list): List of file patterns to process (e.g., ["*.fits"]).
+    
+    Returns:
+        list: A list of files to process.
+    """
+    filelist = []
 
+    if isinstance(file_patterns, str):
+        file_patterns = [file_patterns]
+
+    print('file_patterns',file_patterns)
+    # If file patterns are provided, use glob to find matching files
+    for pattern in file_patterns:
+
+        if os.path.isdir(pattern):
+            file_path = os.path.join(pattern, '*.fits')
+        else:
+            file_path = pattern
+
+        filelist += glob(file_path)
+
+    # Filter out non-fits files
+    filelist = [file for file in filelist if file.endswith('.fits')]
+    
+    # Sort the file list for consistent processing order
+    filelist.sort()
+
+    return filelist
