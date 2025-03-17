@@ -8,12 +8,10 @@ Created on Sun May 24 22:56:25 2015
 """
 
 import os
-import sys
 from astropy.io import fits
 from glob import glob
 from optparse import OptionParser
 import numpy as np
-import peakutils
 import matplotlib.pyplot as plt
 from datetime import datetime
 import re
