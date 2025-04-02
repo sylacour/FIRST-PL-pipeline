@@ -54,13 +54,7 @@ usage = """
 
 
 
-def get_filelist(folder, pixel_map_file):
-    filelist = []
-    if folder.endswith("*fits"):
-        folder = folder[:-5]
-    for file in os.listdir(folder):
-        if file.endswith(".fits"):
-            filelist.append(os.path.join(folder, file))
+def filter_filelist(filelist , filelist_pixelmap):
 
     # Keys to keep only the RAW files
     fits_keywords = {'DATA-CAT': ['RAW']}
@@ -76,34 +70,16 @@ def get_filelist(folder, pixel_map_file):
     fits_keywords = {'DATA-CAT': ['PIXELMAP']}
         
     # Use the function to clean the filelist
-    pixelmaps_list = []
-
-    if os.path.isfile(pixel_map_file):
-        pixelmaps_list.append(pixel_map_file)
-    else:
-        if not pixel_map_file.endswith(".fits"):
-            for file in os.listdir(pixel_map_file):
-                if file.endswith(".fits"):
-                    pixelmaps_list.append(os.path.join(pixel_map_file,file))
-
-    pixel_map_file = runlib.latest_file(pixelmaps_list)
-
-    filelist_pixelmap = runlib.clean_filelist(fits_keywords, [pixel_map_file])
-
-
+    filelist_pixelmap = runlib.clean_filelist(fits_keywords, filelist_pixelmap)
+    print("Pixel map file ==>> ",filelist_pixelmap)
 
     # raise an error if filelist_cleaned is empty
     if len(filelist_pixelmap) == 0:
         raise ValueError("No pixel map to pre-process")
 
-    print("Pixel map file ==>> ",filelist_pixelmap)
     # raise an error if filelist_cleaned is empty
     if len(filelist_pixelmap) > 1:
-        raise ValueError("Two many pixel maps to use! I can only use one")
-
-
-    # traces_loc+=5
-    # Group files by their directories
+        raise ValueError("Two many pixel maps to use! I can only use one.\n Please specify which one to use with the option --pixel_map")
 
 
     files_by_dir = defaultdict(list)
@@ -124,7 +100,6 @@ def preprocess(filelist_pixelmap,files_by_dir):
     output_channels = header.get('OUT_CHAN', 38)
     traces_loc=fits.getdata(filelist_pixelmap[-1])
 
-    #%%
     # Process each directory separately 
     for dir_path, files in files_by_dir.items():
         raw_image = None
@@ -230,31 +205,26 @@ def preprocess(filelist_pixelmap,files_by_dir):
         fig.savefig(filename_out, dpi=300)
         print("PNG saved as: "+filename_out)
 
-
-def run_preprocess(folder = ".",pixel_map_file = None):
-    # Default values
-    if folder.endswith("*fits"):
-        folder = folder[:-5]
-    if pixel_map_file==None :
-        pixel_map_file = folder + "pixelmaps"
-    
-    filelist_pixelmap,files_by_dir = get_filelist(folder, pixel_map_file)
-    preprocess(filelist_pixelmap,files_by_dir)
-
 if __name__ == "__main__":
     debug = False
 
     parser = OptionParser(usage)
     # Default values
-    folder ="."
+    default_folder ="."
 
     # Add options for these values
-    parser.add_option("--pixel_map", type="string", default=None,
+    parser.add_option("--pixel_map", type="string", default=default_folder,
                     help="Force to select which pixel map file to use (default: the one in the directory)")
 
     (options, args) = parser.parse_args()
-    pixel_map_file = options.pixel_map
-    folder = args[0] if args else folder
 
-    filelist_pixelmap,files_by_dir = get_filelist(folder, pixel_map_file)
+    file_patterns=args if args else ['*.fits']
+
+    filelist=runlib.get_filelist( file_patterns )
+    filelist_pixelmap=runlib.get_filelist( options.pixel_map )
+
+
+    filelist_pixelmap,files_by_dir = filter_filelist(filelist , filelist_pixelmap)
     preprocess(filelist_pixelmap,files_by_dir)
+
+# %%

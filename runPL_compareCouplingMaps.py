@@ -70,6 +70,7 @@ if "VSCODE_PID" in os.environ:
     filelist = glob("/Users/slacour/DATA/LANTERNE/Optim_maps/202*/*/preproc/*fits")
     filelist = glob("/Users/slacour/DATA/LANTERNE/Optim_maps/2024-05-02/*/preproc/*fits")
     filelist = glob("/home/jsarrazin/Bureau/PLDATA/InitData/Neon1/preproc/*fits")
+    filelist = glob("/Users/slacour/DATA/LANTERNE/Optim_maps/May2024/preproc/*fits")
     cmap_size = 19
     # filelist = glob("/Users/slacour/DATA/LANTERNE/Optim_maps/firstpl/*")
     filelist.sort()  # process the files in alphabetical order
@@ -92,9 +93,8 @@ else:
 
 # print(filelist)
 # Keys to keep only the RAW files
-fits_keywords = {'DPR_CATG': ['PREPROC'], 
-                 'DPR_TYPE': ['CMAP'],
-                 'DPR_OPT': ['DARK']}
+fits_keywords = {'DATA-CAT': ['PREPROC'],
+                 'DATA-TYP': ['DARK']}
     
 # Use the function to clean the filelist
 print("\n")
@@ -107,8 +107,9 @@ if len(filelist_dark) == 0:
     raise ValueError("No good darks")
 
 # Keys to keep only the RAW files
-fits_keywords = {'DPR_CATG': ['PREPROC'], 
-                 'DPR_TYPE': ['CMAP']}
+fits_keywords = {'DATA-CAT': ['PREPROC'],
+                 'DATA-TYP': ['OBJECT'],
+                 'NAXIS3': [cmap_size*cmap_size]}
     
 # Use the function to clean the filelist
 filelist_cmap = runlib.clean_filelist(fits_keywords, filelist)
@@ -120,7 +121,7 @@ filelist_cmap=np.sort(filelist_cmap)[:]
 
 for data_file in filelist_cmap:
     header=fits.getheader(data_file)
-    print(header['NAXIS1'],header['NAXIS2'],header['NAXIS3'],"\t", data_file.split('/')[-3:],"--->"," PIX_SHIF = ",header['PIX_SHIF'])
+    # print(header['NAXIS1'],header['NAXIS2'],header['NAXIS3'],"\t", data_file.split('/')[-3:],"--->"," PIX_SHIF = ",header['PIX_SHIF'])
 
 # Filter out files where the keyword NAXIS1 is below 600
 filelist_cmap = [f for f in filelist_cmap if fits.getheader(f)['NAXIS3'] == cmap_size*cmap_size]
@@ -163,7 +164,7 @@ for data_file,dark_file  in closest_dark_files.items():
     data_dark=fits.getdata(dark_file)
     data=np.double(fits.getdata(data_file))
     data-=data_dark
-    print(data_file.split('/')[-3:],"--->",data.shape,header['PIX_SHIF'])
+    # print(data_file.split('/')[-3:],"--->",data.shape,header['PIX_SHIF'])
 
     flux = data.reshape((len(data),-1))
     all_flux+=[flux.T]
