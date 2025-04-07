@@ -10,6 +10,8 @@ import os
 import numpy as np
 from scipy import linalg
 from tqdm import tqdm
+from astropy.io import fits
+from scipy.ndimage import uniform_filter1d
 
 import matplotlib.pyplot as plt
 from matplotlib import animation
@@ -88,34 +90,6 @@ def create_movie_cross(datacube):
     anim.save('firtpl_CMAP_MOVIE.mp4', writer=FFwriter)
 
 
-def resize_and_shift(image_2d, dither_x, dither_y, sumPos, default = np.zeros(1)):
-
-    cmap_size2 = image_2d.shape[-1]
-    Npos=len(dither_x)
-    Ncube = np.prod(image_2d.shape[:-2]) // Npos
-    image_2d = image_2d.reshape((Ncube, Npos, cmap_size2, cmap_size2))
-
-    delta_x = dither_x.max()-dither_x.min()
-    delta_y = dither_y.max()-dither_y.min()
-    cmap_size3 = cmap_size2 + max(delta_x, delta_y)
-    if sumPos:
-        image_2d_bigger = np.zeros((Ncube, cmap_size3, cmap_size3))
-    else:
-        image_2d_bigger = np.ones((Ncube, Npos, cmap_size3, cmap_size3))
-
-    if default.ndim < image_2d.ndim:
-        default = np.expand_dims(default, axis=tuple(range(default.ndim, image_2d_bigger.ndim)))
-
-    image_2d_bigger*=default
-
-    for i, x, y in tqdm(zip(range(Npos), dither_x, dither_y)):
-        x2 = -dither_x.min()-x
-        y2 = -dither_y.min()-y
-        if sumPos:
-            image_2d_bigger[:, x2:x2+cmap_size2, y2:y2+cmap_size2] += image_2d[:, i]
-        else:
-            image_2d_bigger[:, i, x2:x2+cmap_size2, y2:y2+cmap_size2] = image_2d[:, i]
-    return image_2d_bigger
 
 def reconstruct_images(projected_data,projected_data_2_image,masque,dither_x,dither_y, sumPos = True):
 
@@ -132,10 +106,10 @@ def reconstruct_images(projected_data,projected_data_2_image,masque,dither_x,dit
     return image_2d_bigger
 
 
-def generate_plots(singular_values, chi2_delta, flux_goodData, chi2_goodData, chi2_threshold, cross_correlated_projected_data, shifted_projected_data, fluxtiptilt_2_projdata_matrix, output_dir):
+def generate_plots(singular_values, chi2_delta, flux_goodData, chi2_goodData, chi2_threshold, cross_correlated_projected_data, shifted_projected_data, fluxtiptilt_2_data, output_dir):
     # Singular values plot
 
-    Nsingular = fluxtiptilt_2_projdata_matrix.shape[1]
+    Nsingular = cross_correlated_projected_data.shape[0]
     Ncube = cross_correlated_projected_data.shape[1]
     cmap_size = cross_correlated_projected_data.shape[-1]
 
@@ -164,14 +138,17 @@ def generate_plots(singular_values, chi2_delta, flux_goodData, chi2_goodData, ch
     axs[0].imshow(chi2_delta, aspect="auto", interpolation='none')
     axs[0].set_ylabel('Chi2')
     axs[0].set_title('Chi2 Delta')
+    axs[0].set_rasterized(True)
 
     axs[1].imshow(flux_goodData.reshape((Ncube, -1)), aspect="auto", interpolation='none')
     axs[1].set_ylabel('N cube')
     axs[1].set_title('Masque on flux')
+    axs[1].set_rasterized(True)
 
     axs[2].imshow(chi2_goodData.reshape((Ncube, -1)), aspect="auto", interpolation='none')
     axs[2].set_ylabel('N cube')
     axs[2].set_title('Masque on chi2')
+    axs[2].set_rasterized(True)
 
     axs[3].plot(chi2_delta.T)
     axs[3].plot(np.ones(cmap_size * cmap_size) * chi2_threshold, 'r')
@@ -184,15 +161,18 @@ def generate_plots(singular_values, chi2_delta, flux_goodData, chi2_goodData, ch
     axs_last = [fig.add_subplot(5, 3, 13), fig.add_subplot(5, 3, 14), fig.add_subplot(5, 3, 15)]
 
     max_chi2 = np.nanmax(chi2_delta.ravel())
-    axs_last[0].hist(chi2_delta.ravel()[flux_goodData], bins=30, range=(0, max_chi2))
-    axs_last[0].hist(chi2_delta.ravel()[chi2_goodData], bins=30, range=(0, max_chi2))
+    axs_last[0].hist(chi2_delta.ravel(), bins=30, range=(0, max_chi2),alpha=0.2)
+    axs_last[0].hist(chi2_delta[flux_goodData], bins=30, range=(0, max_chi2))
+    axs_last[0].hist(chi2_delta[chi2_goodData], bins=30, range=(0, max_chi2))
     axs_last[0].set_title('Chi2 Delta Histogram')
 
     axs_last[1].imshow(np.nansum(chi2_delta.reshape((Ncube, cmap_size, cmap_size)), axis=0), interpolation='none', vmin=0, vmax=max_chi2)
     axs_last[1].set_title('Chi2 Delta Sum')
+    axs_last[1].set_rasterized(True)
 
     axs_last[2].imshow(chi2_goodData.reshape((Ncube, cmap_size, cmap_size)).sum(axis=0), interpolation='none')
     axs_last[2].set_title('Chi2 Good Data Sum')
+    axs_last[2].set_rasterized(True)
 
     plt.tight_layout()
 
@@ -231,9 +211,13 @@ def generate_plots(singular_values, chi2_delta, flux_goodData, chi2_goodData, ch
             ax.text(0.5, 0.05, f'#{i + 1}', transform=ax.transAxes, ha='center')
 
     # Covariance and correlation matrix plot
-    F2PM = fluxtiptilt_2_projdata_matrix[:, :, 0]
-    cov_matrix = np.cov(F2PM)
-    cor_matrix = np.corrcoef(F2PM)
+    Nmodel = fluxtiptilt_2_data.shape[0]
+    Nwave = fluxtiptilt_2_data.shape[1]
+    Noutput = fluxtiptilt_2_data.shape[2]
+
+    F2PM = fluxtiptilt_2_data[:, :, :, 0]
+    cov_matrix = np.cov(F2PM.reshape((Nmodel,Nwave*Noutput)))
+    cor_matrix = np.corrcoef(F2PM.reshape((Nmodel,Nwave*Noutput)))
 
     fig, ax = plt.subplots(1, 2, num='Covariance and Correlation Matrix', figsize=(12, 6), clear=True)
     cax0 = ax[0].matshow(cov_matrix, cmap='viridis')
@@ -242,6 +226,7 @@ def generate_plots(singular_values, chi2_delta, flux_goodData, chi2_goodData, ch
     fig.colorbar(cax1, ax=ax[1])
     ax[0].set_title('Covariance Matrix of Singular Vector Models')
     ax[1].set_title('Correlation Matrix of Singular Vector Models')
+    fig.tight_layout()
 
     # Save all plots to a PDF
     pdf_filename = os.path.join(output_dir, "plots_summary.pdf")
@@ -251,3 +236,124 @@ def generate_plots(singular_values, chi2_delta, flux_goodData, chi2_goodData, ch
             pdf.savefig(fig)
 
     print(f"All plots saved to {pdf_filename}")
+
+
+def extract_datacube(closest_dark_files,Nsmooth = 1,Nbin = 1):
+    """
+    Extracts and processes data cubes from the input files.
+    Subtracts dark files, applies wavelength smoothing, and calculates variance.
+    Returns the processed data cubes, variance cubes, and a header to save.
+    If Nsmooth > 1, the data is smoothed along its wavelength dimension by Nsmooth values.
+    If Nbin > 1, the data is binned along its wavelength dimension by Nbin values.
+    """
+
+    datacube=[]
+    datacube_var=[]
+    for data_file,dark_file  in closest_dark_files.items():
+        header_tosave=fits.getheader(data_file)
+
+    file_number=1
+
+    for data_file,dark_file  in closest_dark_files.items():
+        header=fits.getheader(data_file)
+        data_dark=fits.getdata(dark_file)
+        if len(data_dark)==1:
+            data_dark=data_dark[0]
+            data_dark_std=data_dark[0]*0+12
+        else:
+            data_dark=data_dark.mean(axis=0)
+            data_dark_std=data_dark.std(axis=0)
+        data=np.double(fits.getdata(data_file))
+        data-=data_dark
+        gain=header['GAIN']
+        data_var=data_dark_std**2+gain*np.abs(data)
+
+        Npos=data.shape[0]
+        Noutput=data.shape[1]
+        Nwave=data.shape[2]
+
+        if Nsmooth > 1:
+            # Smooth data along its third dimension by Nsmooth values using uniform_filter1d
+            data = uniform_filter1d(data, size=Nsmooth, axis=2, mode='nearest')
+            data_var = uniform_filter1d(data_var, size=Nsmooth, axis=2, mode='nearest')
+
+        if Nbin > 1:
+            data=data[:,:,:(Nwave//Nbin)*Nbin]
+            data_var=data_var[:,:,:(Nwave//Nbin)*Nbin]
+
+            data=data.reshape((Npos,Noutput,Nwave//Nbin,Nbin)).sum(axis=-1)
+            data_var=data_var.reshape((Npos,Noutput,Nwave//Nbin,Nbin)).sum(axis=-1)
+
+        Nwave=data.shape[2]
+
+        datacube+=[data]
+        datacube_var+=[data_var]
+
+        header_tosave['FILE'+str(file_number)]=os.path.basename(data_file)
+        
+
+    return datacube,datacube_var,header_tosave
+
+
+def resize_and_shift(flux, masque, dither_x, dither_y):
+    """
+    Resize and shift a 2D or 3D flux map based on dither offsets and a mask.
+    This function processes a flux map by resizing it and applying shifts 
+    determined by the dither offsets in the x and y directions. The output 
+    is a larger image cube that accommodates the shifts while preserving 
+    the original flux data within the specified mask.
+    Args:
+        flux (numpy.ndarray): A 3D or 4D array representing the flux data. 
+            The shape is expected to be (Npos, Nmodel, Ncube[, Nwave]), 
+            where Npos is the number of positions, Nmodel is the number of 
+            models, Ncube is the cube size, and Nwave is the number of 
+            wavelengths (optional).
+        masque (numpy.ndarray): A 2D boolean array of of size Npos*Npos,
+            indicating which elements of the flux map are valid.
+        dither_x (numpy.ndarray): A 1D array of length Npos containing 
+            the dither offsets in the x direction.
+        dither_y (numpy.ndarray): A 1D array of length Npos containing 
+            the dither offsets in the y direction.
+    Returns:
+        numpy.ndarray: A resized and shifted 4D or 5D array of shape 
+            (Npos, cmap_size2, cmap_size2, Ncube[, Nwave]), where cmap_size2 
+            is the adjusted size to accommodate the maximum dither offsets.
+    Raises:
+        ValueError: If the sum of the positive elements of `masque` does not equal Nmodel.
+        ValueError: If Npos does not match the length of `dither_x` or `dither_y`.
+    Notes:
+        - The function calculates the required size of the output array 
+          (`cmap_size2`) based on the maximum dither offsets in both 
+          x and y directions.
+        - The input flux data is placed into the larger output array 
+          at positions determined by the dither offsets.
+    """
+
+    Npos= flux.shape[0]
+    Nmodel = flux.shape[1]
+    Ncube = flux.shape[2]
+    cmap_size = masque.shape[0]
+    if len(flux.shape) == 4:
+        Nwave= flux.shape[3]
+    else:
+        Nwave=1
+
+    if np.sum(masque) != Nmodel:
+        raise ValueError(f"The sum of masque ({np.sum(masque)}) is not equal to Nmodel ({Nmodel}).")
+    if Npos != len(dither_x):
+        raise ValueError(f"Npos ({Npos}) is not equal to the length of the third axis of flux ({flux.shape[3]}).")
+    
+    delta_x = dither_x.max()-dither_x.min()
+    delta_y = dither_y.max()-dither_y.min()
+    cmap_size2 = cmap_size + max(delta_x, delta_y)
+    if Nwave > 1:
+        image_2d_bigger = np.zeros((Npos, cmap_size2, cmap_size2, Ncube, Nwave ))
+    else:
+        image_2d_bigger = np.zeros((Npos, cmap_size2, cmap_size2, Ncube ))
+
+    for i in tqdm(range(Npos)):
+        x2 = -dither_x.min()-dither_x[i]
+        y2 = -dither_y.min()-dither_y[i]
+        image_2d_bigger[i,x2:x2+cmap_size, y2:y2+cmap_size][masque] = flux[i]
+
+    return image_2d_bigger
