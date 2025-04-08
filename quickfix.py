@@ -4,7 +4,7 @@ from astropy.io import fits
 from glob import glob
 
 from runPL_createPixelMap import run_createPixelMap
-from runPL_preprocess import run_preprocess
+from runPL_preprocess import preprocess
 import runPL_library as runlib
 import numpy as np
 import matplotlib
@@ -44,7 +44,6 @@ def update_date_in_fits(folder_path):
             except Exception as e:
                 print(f"Failed to update DATE in {file_name}: {e}")
 
-<<<<<<< HEAD
 
 
 def update_header_value(file, which_header, what_value):
@@ -88,7 +87,6 @@ update_header_value("/home/jsarrazin/Bureau/PLDATA/InitData/Neon4/firstpl_00:59:
 
 
 '''
-=======
 def compare_neon_calibration():
     fits_keywords = {'DATA-CAT': ['RAW'], 
                         'DATA-TYP': ['WAVE']}
@@ -153,18 +151,13 @@ def most_recent_stars():
     print(latest_star)
 
 if __name__ == "__main__":
-        # Example dimensions
-    t, y, v = 4, 3, 2  # 4 frames, 3 height pixels, 2 values per pixel (e.g., RGB)
-
-    # Create fake "files" (arrays) in the filelist
-    filelist_cleaned = [
-        np.ones((t, y, v)) * 1,  # First file with all values 1
-        np.ones((t, y, v)) * 2,  # Second file with all values 2
-        np.ones((t, y, v)) * 3   # Third file with all values 3
-    ]
-
-    # Initialize raw_image
-    raw_image = np.zeros((y, v))  # Shape matches the summed dimensions
-    for filename in filelist_cleaned:
-        raw_image += filename.sum(axis=0)
->>>>>>> 58a73ba (Fixes and wip)
+    nov1 = "/home/jsarrazin/Bureau/PLDATA/novembre/2024-11-21_13-48-32_science/"
+    nov2 = "/home/jsarrazin/Bureau/PLDATA/novembre/2024-11-21_14-09-14_science/"
+    nov3 = "/home/jsarrazin/Bureau/PLDATA/novembre/2024-11-21_14-36-09_science/"
+    nov4 = "/home/jsarrazin/Bureau/PLDATA/novembre/2024-11-21_15-43-53_science/"
+    nov5 = "/home/jsarrazin/Bureau/PLDATA/novembre/2024-11-21_16-03-39_science/"
+    update_date_in_fits(nov1)
+    update_date_in_fits(nov2)
+    update_date_in_fits(nov3)
+    update_date_in_fits(nov4)
+    update_date_in_fits(nov5)

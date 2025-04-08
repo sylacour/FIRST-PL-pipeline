@@ -278,7 +278,7 @@ def save_fits_and_png(raw_image,traces_loc, header, x_found,y_found, pixel_min, 
 
 
 def run_createPixelMap(folder, destination, pixel_min=100, pixel_max=1600, pixel_wide=3, output_channels=38, file_patterns=["*.fits"]):
-    filelist = process_files(folder, pixel_min, pixel_max,pixel_wide,output_channels,file_patterns)
+    filelist = process_files(folder, file_patterns)
     raw_Image, header = raw_image_clean(filelist)
     traces_loc, x_found,y_found, x_none, y_none = generate_pixelmap(raw_Image, pixel_min, pixel_max, output_channels)
     #checking_wavelength_aligment_in_modes(x_none, y_none) # TESTING ONLY, TO REMOVE

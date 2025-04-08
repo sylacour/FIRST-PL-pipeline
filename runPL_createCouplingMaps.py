@@ -355,8 +355,9 @@ if __name__ == "__main__":
     parser.add_option("--make_movie", action="store_true", default=make_movie,
                     help="Create a nice mp4 with all datacubes -- can be long (default: %default)")
     
-    if "VSCODE_PID" in os.environ:
+    if "VSCODE_PID" in os.environ or os.environ.get('TERM_PROGRAM') == 'vscode':
         file_patterns = "/Users/slacour/DATA/LANTERNE/Optim_maps/November2024/preproc"
+        file_patterns = "/home/jsarrazin/Bureau/PLDATA/moreTest/2024-11-21_13-48-32_science_copie/preproc"
         cmap_size = 25
     else:
         # Parse the options
@@ -366,7 +367,7 @@ if __name__ == "__main__":
         cmap_size=options.cmap_size
         Nsingular=options.Nsingular
         wavelength_smooth=options.interpolation_factor
-        interpolation_factor=options.pixel_wide
+        #interpolation_factor=options.pixel_wide
         make_movie=options.make_movie
         wavelength_bin=options.wavelength_bin
         file_patterns=args if args else ['*.fits']

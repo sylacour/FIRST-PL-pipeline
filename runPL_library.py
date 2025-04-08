@@ -86,7 +86,10 @@ def find_closest_in_time_dark(file, dark_files):
 def find_closest_dark(file, dark_files, filter_by_directory = False):
 
     cmap_dir = os.path.dirname(file)
-    dark_files = [dark for dark in dark_files if fits.getheader(dark)['GAIN'] == fits.getheader(file)['GAIN']]
+    try :
+        dark_files = [dark for dark in dark_files if fits.getheader(dark)['GAIN'] == fits.getheader(file)['GAIN']]
+    except:
+        dark_files=dark_files
     if len(dark_files) == 0:
         raise ValueError("No dark file available with correct gain to reduce file %s"%file)
 

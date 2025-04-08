@@ -7,7 +7,7 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(parent_dir)
 import runPL_library as runlib
 from runPL_createPixelMap import run_createPixelMap
-from runPL_preprocess import run_preprocess
+from runPL_preprocess import preprocess
 from runPL_createWavelengthMap import runCreateWavelengthMap
 from runPL_createWavelengthMap import runForStar
 import numpy as np
@@ -39,7 +39,7 @@ def NeonCalibration(whereFiles, wavelist, allYesInput =False):
 
     permission = promptContinue(command="Run preprocess", yesInput=allYesInput )
     if permission:
-        run_preprocess(folder = whereFiles,pixel_map_file = None)
+        preprocess(folder = whereFiles,pixel_map_file = None)
 
     permission = promptContinue(command="Create wavelength map", yesInput=allYesInput)
     if permission:
@@ -82,7 +82,8 @@ def reduct_star_data(whereFiles, allYesInput =False):
 
     permission = promptContinue(command="Run preprocess", yesInput=allYesInput )
     if permission:
-        run_preprocess(folder = whereFiles,pixel_map_file = None)
+        filelist_pixelmap = runlib.clean_filelist({"DATA-CAT": 'PIXELMAP'}, runlib.get_filelist(os.path.join(whereFiles, "pixelmaps")))
+        preprocess(filelist_pixelmap, files_by_dir={whereFiles:whereFiles})
     
     permission = promptContinue(command="Shift to wavelenght", yesInput=allYesInput )
     if permission:
@@ -139,9 +140,15 @@ if __name__ == "__main__":
     neon4 = "/home/jsarrazin/Bureau/PLDATA/InitData/Neon4/"
     lesautres = "/home/jsarrazin/Bureau/PLDATA/InitData/"
     onestar ="/home/jsarrazin/Bureau/PLDATA/InitData/im_cube_2024-08-18_11-01-23_altair/"
+    nov1 = "/home/jsarrazin/Bureau/PLDATA/novembre/2024-11-21_13-48-32_science/"
+    nov2 = "/home/jsarrazin/Bureau/PLDATA/novembre/2024-11-21_14-09-14_science/"
+    nov3 = "/home/jsarrazin/Bureau/PLDATA/novembre/2024-11-21_14-36-09_science/"
+    nov4 = "/home/jsarrazin/Bureau/PLDATA/novembre/2024-11-21_15-43-53_science/"
+    nov5 = "/home/jsarrazin/Bureau/PLDATA/novembre/2024-11-21_16-03-39_science/"
+
 
     #Change whereFiles accordingly
-    whereFiles = neon4
+    whereFiles = nov1
 
     # à la main avec neon1 :
     wavelist = "[748.9, 724.5, 703.2, 693, 671.7, 667.8, 659.9, 653.3, 650.7, 640.2, 638.2, 633.4, 626.7]"
