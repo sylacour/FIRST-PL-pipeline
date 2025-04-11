@@ -89,7 +89,7 @@ def filter_filelist(filelist , filelist_pixelmap):
 
     return filelist_pixelmap,files_by_dir
 
-def preprocess(filelist_pixelmap,files_by_dir):
+def preprocess(filelist_pixelmap,files_by_dir, output_channels_nb=38):
 
     header = fits.getheader(filelist_pixelmap[-1])
 
@@ -97,7 +97,7 @@ def preprocess(filelist_pixelmap,files_by_dir):
     pixel_min = header.get('PIX_MIN', 100)
     pixel_max = header.get('PIX_MAX', 1600)
     pixel_wide = header.get('PIX_WIDE', 2)
-    output_channels = header.get('OUT_CHAN', 38)
+    output_channels = header.get('OUT_CHAN', output_channels_nb)
     traces_loc=fits.getdata(filelist_pixelmap[-1])
 
     # Process each directory separately 
@@ -204,6 +204,17 @@ def preprocess(filelist_pixelmap,files_by_dir):
         filename_out = os.path.join(preproc_dir_path, f"firstpl_"+date_preproc+"_PREPROCSHIFT.png")
         fig.savefig(filename_out, dpi=300)
         print("PNG saved as: "+filename_out)
+    
+
+def run_preprocess(folder = ".",pixel_map_file = None):
+    # Default values
+    filelist = runlib.get_filelist(folder)
+    if pixel_map_file==None :
+        pixel_map_file = folder + "pixelmaps"
+    
+    filelist_pixelmap,files_by_dir = filter_filelist(filelist, pixel_map_file)
+    preprocess(filelist_pixelmap,files_by_dir, output_channels_nb=1)#38)
+
 
 if __name__ == "__main__":
     debug = False

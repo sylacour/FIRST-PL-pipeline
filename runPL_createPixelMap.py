@@ -241,8 +241,8 @@ def save_fits_and_png(raw_image,traces_loc, header, x_found,y_found, pixel_min, 
     fig,ax=runlib.make_figure_of_trace(raw_image,traces_loc,pixel_wide,pixel_min,pixel_max)
 
     
-    annotation = True
-    y_trace = True
+    annotation = False
+    y_trace = False
     if not y_trace :
         for i in range(output_channels):
             ax.plot(x_found[i],y_found[i],'w-',linewidth=0.5)

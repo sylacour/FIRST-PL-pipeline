@@ -7,7 +7,7 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(parent_dir)
 import runPL_library as runlib
 from runPL_createPixelMap import run_createPixelMap
-from runPL_preprocess import preprocess
+from runPL_preprocess import run_preprocess
 from runPL_createWavelengthMap import runCreateWavelengthMap
 from runPL_createWavelengthMap import runForStar
 import numpy as np
@@ -83,7 +83,7 @@ def reduct_star_data(whereFiles, allYesInput =False):
     permission = promptContinue(command="Run preprocess", yesInput=allYesInput )
     if permission:
         filelist_pixelmap = runlib.clean_filelist({"DATA-CAT": 'PIXELMAP'}, runlib.get_filelist(os.path.join(whereFiles, "pixelmaps")))
-        preprocess(filelist_pixelmap, files_by_dir={whereFiles:whereFiles})
+        run_preprocess(whereFiles, filelist_pixelmap)
     
     permission = promptContinue(command="Shift to wavelenght", yesInput=allYesInput )
     if permission:
