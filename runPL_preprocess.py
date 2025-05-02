@@ -52,8 +52,6 @@ usage = """
 """
 
 
-
-
 def filter_filelist(filelist , filelist_pixelmap):
 
     # Keys to keep only the RAW files
@@ -77,10 +75,9 @@ def filter_filelist(filelist , filelist_pixelmap):
     if len(filelist_pixelmap) == 0:
         raise ValueError("No pixel map to pre-process")
 
-    # raise an error if filelist_cleaned is empty
+    # raise an error if filelist_cleaned is more than one
     if len(filelist_pixelmap) > 1:
         raise ValueError("Two many pixel maps to use! I can only use one.\n Please specify which one to use with the option --pixel_map")
-
 
     files_by_dir = defaultdict(list)
     for file in filelist_rawdata:
@@ -224,15 +221,19 @@ if __name__ == "__main__":
     default_folder ="."
 
     # Add options for these values
-    parser.add_option("--pixel_map", type="string", default=default_folder,
+    parser.add_option("--pixel_map", type="string", default=None,
                     help="Force to select which pixel map file to use (default: the one in the directory)")
 
     (options, args) = parser.parse_args()
-
     file_patterns=args if args else ['*.fits']
 
+    # If the user specifies a pixel map use it, otherwise look into the arguments
+    pixel_map = options.pixel_map
+    if pixel_map is None:
+        pixel_map = file_patterns
+
     filelist=runlib.get_filelist( file_patterns )
-    filelist_pixelmap=runlib.get_filelist( options.pixel_map )
+    filelist_pixelmap=runlib.get_filelist( pixel_map )
     filelist_pixelmap,files_by_dir = filter_filelist(filelist , filelist_pixelmap)
 
     preprocess(filelist_pixelmap,files_by_dir)
