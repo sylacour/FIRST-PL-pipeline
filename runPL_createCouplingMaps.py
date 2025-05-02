@@ -120,9 +120,9 @@ def filter_filelist(filelist,cmap_size=25):
         else:
             return find_closest_in_time_dark(cmap_file, dark_files) 
 
-    closest_dark_files = {cmap: find_closest_dark(cmap, filelist_dark) for cmap in filelist_cmap}
+    files_with_dark = {cmap: find_closest_dark(cmap, filelist_dark) for cmap in filelist_cmap}
 
-    return closest_dark_files
+    return files_with_dark
 
 
 def get_shift_between_image(projdata):
@@ -352,7 +352,7 @@ def quick_plot(data,title =""):
     plt.title(title)
     print("Done")
 
-def run_create_coupling_maps(closest_dark_files, 
+def run_create_coupling_maps(files_with_dark, 
                                 cmap_size = 25,
                                 wavelength_smooth = 20,
                                 wavelength_bin = 15,
@@ -366,11 +366,11 @@ def run_create_coupling_maps(closest_dark_files,
     
     plt.close("all")
 
-    files_names = [os.path.basename(file) for file in closest_dark_files]
+    files_names = [os.path.basename(file) for file in files_with_dark]
 
     #Input preproc
     #clean and sum all data
-    datacube,datacube_var,header=runlib_i.extract_datacube(closest_dark_files,wavelength_smooth,Nbin=wavelength_bin)
+    datacube,datacube_var,header=runlib_i.extract_datacube(files_with_dark,wavelength_smooth,Nbin=wavelength_bin)
     #datacube (625, 38, 100)
     quick_fits(datacube, 'datacube')
 
@@ -534,30 +534,30 @@ if __name__ == "__main__":
     print(file_patterns)
     filelist = runlib.get_filelist(file_patterns)
     print(filelist)
-    closest_dark_files = filter_filelist(filelist,cmap_size)
+    files_with_dark = filter_filelist(filelist,cmap_size)
 
     try:
-        closest_dark_files.pop('/Users/slacour/DATA/LANTERNE/Optim_maps/November2024/preproc/firstpl_2025-01-14T15:34:08_NONAME.fits')
+        files_with_dark.pop('/Users/slacour/DATA/LANTERNE/Optim_maps/November2024/preproc/firstpl_2025-01-14T15:34:08_NONAME.fits')
 
         for _ in range(7):
-            closest_dark_files.pop(next(iter(closest_dark_files)))
+            files_with_dark.pop(next(iter(files_with_dark)))
 
-        # closest_dark_files.pop(next(reversed(closest_dark_files)))
-        # closest_dark_files.pop(next(reversed(closest_dark_files)))
-        # closest_dark_files.pop(next(reversed(closest_dark_files)))
+        # files_with_dark.pop(next(reversed(files_with_dark)))
+        # files_with_dark.pop(next(reversed(files_with_dark)))
+        # files_with_dark.pop(next(reversed(files_with_dark)))
     except:
         pass
 
     try:
-        closest_dark_files.pop('/Users/slacour/DATA/LANTERNE/Optim_maps/May2024/preproc/firstpl_2025-02-19T11:25:12_NONAME.fits')
-        closest_dark_files.pop('/Users/slacour/DATA/LANTERNE/Optim_maps/May2024/preproc/firstpl_2025-02-19T11:25:13_NONAME.fits')
-        closest_dark_files.pop('/Users/slacour/DATA/LANTERNE/Optim_maps/May2024/preproc/firstpl_2025-02-19T11:25:14_NONAME.fits')
-        closest_dark_files.pop('/Users/slacour/DATA/LANTERNE/Optim_maps/May2024/preproc/firstpl_2025-02-19T11:25:15_NONAME.fits')
+        files_with_dark.pop('/Users/slacour/DATA/LANTERNE/Optim_maps/May2024/preproc/firstpl_2025-02-19T11:25:12_NONAME.fits')
+        files_with_dark.pop('/Users/slacour/DATA/LANTERNE/Optim_maps/May2024/preproc/firstpl_2025-02-19T11:25:13_NONAME.fits')
+        files_with_dark.pop('/Users/slacour/DATA/LANTERNE/Optim_maps/May2024/preproc/firstpl_2025-02-19T11:25:14_NONAME.fits')
+        files_with_dark.pop('/Users/slacour/DATA/LANTERNE/Optim_maps/May2024/preproc/firstpl_2025-02-19T11:25:15_NONAME.fits')
     except:
         pass
     
 
-    run_create_coupling_maps(closest_dark_files, 
+    run_create_coupling_maps(files_with_dark, 
                                 cmap_size = cmap_size,
                                 wavelength_smooth = wavelength_smooth,
                                 wavelength_bin = wavelength_bin,
