@@ -16,6 +16,7 @@ from scipy.ndimage import uniform_filter1d
 import matplotlib.pyplot as plt
 from matplotlib import animation
 from matplotlib.backends.backend_pdf import PdfPages
+from datetime import datetime
 
 def create_movie_cross(datacube):
 
@@ -105,6 +106,18 @@ def reconstruct_images(projected_data,projected_data_2_image,masque,dither_x,dit
 
     return image_2d_bigger
 
+def save_all_as_PDF(output_dir = "/home/jsarrazin/Bureau/test zone/coupling_maps/"):
+    # Save all plots to a PDF
+    now = datetime.now()
+    date_time_str = now.strftime("%Y_%m_%d_%H_%M_%S")
+    pdf_filename = os.path.join(output_dir, f"plots_summary_{date_time_str}.pdf")
+    with PdfPages(pdf_filename) as pdf:
+        for i in plt.get_fignums():
+            fig = plt.figure(i)
+            pdf.savefig(fig)
+
+    print(f"All plots saved to {pdf_filename}")
+    return 1
 
 def generate_plots(singular_values, chi2_delta, flux_goodData, chi2_goodData, chi2_threshold, cross_correlated_projected_data, shifted_projected_data, fluxtiptilt_2_data, output_dir):
     # Singular values plot
@@ -161,9 +174,10 @@ def generate_plots(singular_values, chi2_delta, flux_goodData, chi2_goodData, ch
     axs_last = [fig.add_subplot(5, 3, 13), fig.add_subplot(5, 3, 14), fig.add_subplot(5, 3, 15)]
 
     max_chi2 = np.nanmax(chi2_delta.ravel())
-    axs_last[0].hist(chi2_delta.ravel(), bins=30, range=(0, max_chi2),alpha=0.2)
-    axs_last[0].hist(chi2_delta[flux_goodData], bins=30, range=(0, max_chi2))
-    axs_last[0].hist(chi2_delta[chi2_goodData], bins=30, range=(0, max_chi2))
+    axs_last[0].hist(chi2_delta.ravel(), bins=30, range=(0, max_chi2),alpha=0.2, label='All data')
+    axs_last[0].hist(chi2_delta[flux_goodData], bins=30, range=(0, max_chi2), label='flux_goodData')
+    axs_last[0].hist(chi2_delta[chi2_goodData], bins=30, range=(0, max_chi2), label='chi2_goodData')
+    axs_last[0].legend()
     axs_last[0].set_title('Chi2 Delta Histogram')
 
     axs_last[1].imshow(np.nansum(chi2_delta.reshape((Ncube, cmap_size, cmap_size)), axis=0), interpolation='none', vmin=0, vmax=max_chi2)
@@ -229,7 +243,9 @@ def generate_plots(singular_values, chi2_delta, flux_goodData, chi2_goodData, ch
     fig.tight_layout()
 
     # Save all plots to a PDF
-    pdf_filename = os.path.join(output_dir, "plots_summary.pdf")
+    now = datetime.now()
+    date_time_str = now.strftime("%Y_%m_%d_%H_%M_%S")
+    pdf_filename = os.path.join(output_dir, f"plots_summary_{date_time_str}_cmap{cmap_size}.pdf")
     with PdfPages(pdf_filename) as pdf:
         for i in plt.get_fignums():
             fig = plt.figure(i)
@@ -354,6 +370,6 @@ def resize_and_shift(flux, masque, dither_x, dither_y):
     for i in tqdm(range(Npos)):
         x2 = -dither_x.min()-dither_x[i]
         y2 = -dither_y.min()-dither_y[i]
-        image_2d_bigger[i,x2:x2+cmap_size, y2:y2+cmap_size][masque] = flux[i]
+        image_2d_bigger[i,x2:x2+cmap_size, y2:y2+cmap_size][masque]  = flux[i]
 
     return image_2d_bigger

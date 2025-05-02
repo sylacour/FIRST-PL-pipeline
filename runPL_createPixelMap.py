@@ -49,7 +49,7 @@ usage = """
 """
 
 
-def process_files(folder=".", file_patterns=["*.fits"]):
+def process_files(folder=".", file_patterns=["**/*.fits"]):
     """
     Processes files based on the given parameters.
 
@@ -97,19 +97,20 @@ def raw_image_clean(filelist):
 
         raw_image = np.zeros((header['NAXIS2'], header['NAXIS1']), dtype=np.double)
         for filename in tqdm(filelist_cleaned, desc="Co-adding files"):
-            raw_image += fits.getdata(filename).sum(axis=0)
+            if not "optim" in filename:
+                raw_image += fits.getdata(filename).sum(axis=0)
         
         return raw_image, header
 
-def generate_pixelmap(raw_image, pixel_min, pixel_max, output_channels):
-    pixel_length=raw_image.shape[1]
+def quick_fits(data, title=""):
+    #For debugging purpose
+    now = datetime.now()
+    date_time_str = now.strftime("%Y_%m_%d_%H_%M_%S")
+    runlib.save_fits_file(data, "/home/jsarrazin/Bureau/test zone/coupling_maps/"+title+"_"+date_time_str+".fits")
+    print("check")
 
-    #300 values of pixels between pixelmin and pixelmax
-    sampling        = np.linspace(pixel_min+5,pixel_max-5,300,dtype=int)
-    peaks           = np.zeros([output_channels, sampling.shape[0]])
-
-    threshold_array=np.linspace(0.01,0.1,50) #originally #np.linspace(0.01,0.1,50) 
-    peaks_number=output_channels
+def loop_lowering_my_treshold( sampling, peaks_number, raw_image, peaks, output_channels, start = 0.01, stop = 0.1, num = 50, instance=0):
+    threshold_array = np.linspace(start, stop, num)
     solution_found=[]
     for i in (range(sampling.shape[0])): #from 0 to the number of samples
         #Sum 10 values of x (wavelenght=columns) of the pic
@@ -127,6 +128,29 @@ def generate_pixelmap(raw_image, pixel_min, pixel_max, output_channels):
         #The values will be saved at the index i of the sample
         peaks[:,i]=detectedWavePeaks
 
+    true_count = sum(solution_found)  # because True == 1, False == 0
+    percentage = true_count / len(solution_found)
+    if percentage>=0.1 : 
+        return solution_found, peaks
+    elif instance<5:
+        solution_found, peaks = loop_lowering_my_treshold(sampling, peaks_number, raw_image, peaks, output_channels, start = start/2, stop = stop*2, num=num+20, instance=instance+1)
+
+    print("Too many runs, no solution found. Verify your pixelmap")
+    print(instance)
+    return
+
+def generate_pixelmap(raw_image, pixel_min, pixel_max, output_channels):
+
+    pixel_length=raw_image.shape[1]
+
+    #300 values of pixels between pixelmin and pixelmax
+    sampling        = np.linspace(pixel_min+5,pixel_max-5,300,dtype=int)
+    peaks           = np.zeros([output_channels, sampling.shape[0]])
+
+    threshold_array=np.linspace(0.01,0.1,50) #originally #np.linspace(0.01,0.1,50) 
+    peaks_number=output_channels
+    
+    solution_found, peaks = loop_lowering_my_treshold( sampling, peaks_number, raw_image, peaks, output_channels)
     traces_loc= np.ones([pixel_length,output_channels],dtype=int)
 
     x_found=[]
@@ -143,6 +167,9 @@ def generate_pixelmap(raw_image, pixel_min, pixel_max, output_channels):
         # y the corresponding positions of each peak/mode
         y = peaks[i][solution_found]
 
+        if i==11:
+            print("check")
+
         # To check for outlier, we make a 1D polyfit between x and y
         for b in range(5): # The process is repeated 5 times to refine the polyfit each time
             poly_coeffs = np.polyfit(x, y, 1)
@@ -153,9 +180,14 @@ def generate_pixelmap(raw_image, pixel_min, pixel_max, output_channels):
 
             # Calculate standard deviation of residuals
             std_residuals = np.std(residuals)
+            if std_residuals < 1*(10**(-10)):
+                x_with_none = x
+                y_with_none = y
+                continue
 
             # Identify inliers (points with residuals within the threshold)
             inliers = np.abs(residuals) < 3 * std_residuals
+            
 
             # Remove outliers
             x = x[inliers]
@@ -276,14 +308,22 @@ def save_fits_and_png(raw_image,traces_loc, header, x_found,y_found, pixel_min, 
     print("File saved as: "+filename_out)
     print("PNG saved as: "+filename_out[:-4]+"png")
 
+def quick_fits(data, title=""):
+    #For debugging purpose
+    now = datetime.now()
+    date_time_str = now.strftime("%Y_%m_%d_%H_%M_%S")
+    runlib.save_fits_file(data, "/home/jsarrazin/Bureau/test zone/coupling_maps/"+title+"_"+date_time_str+".fits")
+    print("check")
 
-def run_createPixelMap(folder, destination, pixel_min=100, pixel_max=1600, pixel_wide=3, output_channels=38, file_patterns=["*.fits"]):
+def run_createPixelMap(folder, destination, pixel_min=100, pixel_max=1600, pixel_wide=3, output_channels=38, file_patterns=["**/*.fits"]):
     filelist = process_files(folder, file_patterns)
     raw_Image, header = raw_image_clean(filelist)
+    quick_fits(raw_Image)
     traces_loc, x_found,y_found, x_none, y_none = generate_pixelmap(raw_Image, pixel_min, pixel_max, output_channels)
     #checking_wavelength_aligment_in_modes(x_none, y_none) # TESTING ONLY, TO REMOVE
     save_fits_and_png(raw_Image, traces_loc, header, x_found,y_found, pixel_min, pixel_max,pixel_wide,output_channels, folder)
     save_fits_and_png(raw_Image,traces_loc, header, x_found,y_found, pixel_min, pixel_max,pixel_wide,output_channels, destination)
+    return raw_Image, traces_loc, header,  x_found,y_found
 
 
 if __name__ == "__main__":

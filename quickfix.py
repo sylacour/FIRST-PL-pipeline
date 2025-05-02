@@ -151,13 +151,14 @@ def most_recent_stars():
     print(latest_star)
 
 if __name__ == "__main__":
-    nov1 = "/home/jsarrazin/Bureau/PLDATA/novembre/2024-11-21_13-48-32_science/"
-    nov2 = "/home/jsarrazin/Bureau/PLDATA/novembre/2024-11-21_14-09-14_science/"
-    nov3 = "/home/jsarrazin/Bureau/PLDATA/novembre/2024-11-21_14-36-09_science/"
-    nov4 = "/home/jsarrazin/Bureau/PLDATA/novembre/2024-11-21_15-43-53_science/"
-    nov5 = "/home/jsarrazin/Bureau/PLDATA/novembre/2024-11-21_16-03-39_science/"
-    update_date_in_fits(nov1)
-    update_date_in_fits(nov2)
-    update_date_in_fits(nov3)
-    update_date_in_fits(nov4)
-    update_date_in_fits(nov5)
+    recent = "/home/jsarrazin/Bureau/PLDATA/2025_03_14"
+
+    filelist = runlib.get_all_fits_files(recent)
+    for file in filelist:
+        if "optim" not in file:
+            runlib.update_anything_in_fits(file, "DATA-CAT", "RAW")
+
+            if "cube" in file:
+                runlib.update_anything_in_fits(file, "DATA-TYP", "OBJECT")
+            elif "dark" in file:
+                runlib.update_anything_in_fits(file, "DATA-TYP", "DARK")

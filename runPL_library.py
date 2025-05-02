@@ -28,7 +28,7 @@ def clean_filelist(fits_keywords, filelist, verbose=False):
         header = first_file[0].header.copy()
         first_file.close()
         del first_file
-
+        
         # Data files with the correct keywords only
         key_names = list(fits_keywords.keys())
         type_ok = True
@@ -75,10 +75,18 @@ def make_figure_of_trace(raw_image,traces_loc,pixel_wide,pixel_min,pixel_max):
 
 
 def find_closest_in_time_dark(file, dark_files):
-    cmap_date = fits.getheader(file)['DATE']
+    try : 
+        cmap_date = fits.getheader(file)['DATE']
+        dark_dates = [(dark, fits.getheader(dark)['DATE']) for dark in dark_files]
+    except:
+        update_header_date([file])
+        update_header_date(dark_files)
+        cmap_date = fits.getheader(file)['DATE']
+        dark_dates = [(dark, fits.getheader(dark)['DATE']) for dark in dark_files]
     
     # find the closest by date
-    dark_dates = [(dark, fits.getheader(dark)['DATE']) for dark in dark_files]
+    
+    
     dark_dates.sort(key=lambda x: abs(datetime.strptime(x[1], '%Y-%m-%dT%H:%M:%S') - datetime.strptime(cmap_date, '%Y-%m-%dT%H:%M:%S')))
     
     return dark_dates[0][0]  # Return the closest dark file by date
@@ -104,6 +112,12 @@ def find_closest_dark(file, dark_files, filter_by_directory = False):
     else:
         return find_closest_in_time_dark(file, dark_files) 
 
+def update_header_date(filelist):
+    for file in filelist:
+        date = get_date_from_filename(file)
+        update_anything_in_fits(file, 'DATE', date)
+    print("Date updated in all files")
+
 
 def create_output_filename(header):
     date = header.get('DATE', 'NODATE')
@@ -123,11 +137,14 @@ def create_output_filename(header):
 
 def get_date_from_filename(filename):
     match = re.search(r"(\d{4}-\d{2}-\d{2})_(\d{2}-\d{2}-\d{2})", filename)
+    match2 = re.search(r"(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})", filename)
     if match:
         # Extract date and time parts
         date_part = match.group(1)
         time_part = match.group(2).replace('-', ':')  # Replace '-' with ':' for time
         return f"{date_part}T{time_part}"
+    elif match2:
+        return f"{match.group(1)}T{match.group(2)}"
     else:
         return None  # Return None if no match is found
     
@@ -265,3 +282,15 @@ def update_anything_in_multiple_fits(folder_path, header, header_value):
                     update_anything_in_fits(file_path, header, header_value)
             except Exception as e:
                 print(f"Failed to update {file_name}: {e}")
+
+
+def save_fits_file(data, filepath, headerDict=None):
+    fits.writeto(filepath, np.array(data), overwrite=True)
+
+    hdu = fits.PrimaryHDU(data)
+    if headerDict is not None:
+        for val in headerDict:
+            hdu.header[val]= headerDict[val]
+    hdul = fits.HDUList([hdu])
+    hdul.writeto(filepath, overwrite=True)
+    print("Fit file saved in : ", filepath)
