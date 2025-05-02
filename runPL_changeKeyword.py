@@ -11,7 +11,7 @@ import sys
 from astropy.io import fits
 from glob import glob
 from optparse import OptionParser
-import runPL_library as runlib
+import runPL_library_io as runlib
 
 # Add options
 usage = """
