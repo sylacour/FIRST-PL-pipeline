@@ -369,275 +369,6 @@ def quick_plot(data,title =""):
     plt.title(title)
     print("Done")
 
-def run_create_coupling_maps(path_to_preproc_, 
-                                cmap_size = 25,
-                                wavelength_smooth = 20,
-                                wavelength_bin = 15,
-                                interpolation_factor = 10,
-                                make_movie = False,
-                                Nsingular=19*3,
-                                folder = "." ):
-    """
-    Used in lancementserie.py for global generation
-    
-    """
-    
-    plt.close("all")
-    
-    filelist = runlib.get_all_fits_files(path_to_preproc_)
-    closest_dark_files = filter_filelist(filelist,cmap_size)
-
-    files_names = [os.path.basename(file) for file in closest_dark_files]
-
-    #Input preproc
-    #clean and sum all data
-    datacube,datacube_var,header=runlib_i.extract_datacube(closest_dark_files,wavelength_smooth,Nbin=wavelength_bin)
-    #datacube (625, 38, 100)
-    quick_fits(datacube, 'datacube')
-
-    datacube=np.array(datacube).transpose((3,2,0,1))
-    datacube_var=np.array(datacube_var).transpose((3,2,0,1))
-
-    Nwave=datacube.shape[0]
-    Noutput=datacube.shape[1]
-    Ncube=datacube.shape[2]
-    Npos=datacube.shape[3]
-
-    Movie=False
-    if Movie:
-        runlib_i.create_movie_cross(datacube)
-
-        if False:
-            plt.close('all')
-
-
-    # select data only above a threshold based on flux
-    flux_thresold=np.percentile(datacube.mean(axis=(0,1)),80)/5
-    flux_goodData=datacube.mean(axis=(0,1)) > flux_thresold
-    plt.imshow(flux_goodData)
-    if np.sum(flux_goodData)<57:
-        #too little good data, we need to lower the bar
-        flux_goodData=datacube.mean(axis=(0,1)) > flux_thresold/2
-
-    # get the Nsingulat highest singular values and the projection vectors into that space 
-    #VSD
-    #datacube : (100, 38, 10, 625)
-    #flux_gooddata : (10, 625)
-    #Nsingular : 57
-    pos_2_singular,singular_values,singular_2_data=get_projection_matrice(datacube,flux_goodData,Nsingular)
-
-
-
-    # cross correlate the dataset to see if there is a significant offset between the different datasets
-    dist_2d_x,dist_2d_y,cross_correlated_projected_data = get_shift_between_image(pos_2_singular)
-
-    # shift and average all the datacubes, do not includes the bad frames
-    pos_2_singular[:,~flux_goodData]=np.nan
-    pos_2_singular_mean,shifted_pos_2_singular = shift_and_add(pos_2_singular, dist_2d_x, dist_2d_y)
-
-    # compute the matrices to go from the projected data to the flux and tip tilt (and inverse)
-    postiptilt_2_data,data_2_postiptilt,postiptilt_masque = get_postiptilt_model(pos_2_singular_mean,singular_2_data)
-
-    #use datamodel to check if the observations are point like
-    # To do so, fits the vector model and check if the chi2 decrease resonably
-    chi2_min,chi2_max,arg_model=get_chi2_maps(datacube,postiptilt_2_data,data_2_postiptilt)
-    chi2_delta=chi2_min/chi2_max
-    percents=np.nanpercentile(chi2_delta[flux_goodData],[16,50,84])
-    chi2_threshold=percents[1]+(percents[2]-percents[0])*3/2
-    chi2_goodData = (chi2_delta < chi2_threshold)&flux_goodData
-
-    #redo most of the work above but with flagged datasets
-    pos_2_singular,singular_values,singular_2_data=get_projection_matrice(datacube,chi2_goodData,Nsingular)
-    dist_2d_x,dist_2d_y,cross_correlated_projected_data = get_shift_between_image(pos_2_singular)
-    pos_2_singular[:,~chi2_goodData]=np.nan
-    pos_2_singular_mean,shifted_pos_2_singular = shift_and_add(pos_2_singular, dist_2d_x, dist_2d_y)
-    postiptilt_2_data,data_2_postiptilt,postiptilt_masque = get_postiptilt_model(pos_2_singular_mean,singular_2_data)
-
-    flux_2_data,data_2_flux = get_flux_model(postiptilt_2_data)
-    # Save arrays into a FITS file
-
-
-    output_filename = "output_data.fits"
-
-    # Create a primary HDU with no data, just the header
-    hdu_primary = fits.PrimaryHDU()
-
-    # Create HDUs for each array
-    hdu_0 = fits.ImageHDU(data=postiptilt_masque.astype(np.uint8), name='MASQUE')  # Save masque as uint8 to save space
-    hdu_1 = fits.ImageHDU(data=flux_2_data, name='F2DATA')
-    hdu_2 = fits.ImageHDU(data=data_2_flux, name='DATA2F')
-    hdu_3 = fits.ImageHDU(data=postiptilt_2_data, name='FTT2DATA')
-    hdu_4 = fits.ImageHDU(data=data_2_postiptilt, name='DATA2FTT')
-
-    header['DATA-CAT'] = 'COUPLINGMAP'
-    # Add date and time to the header
-    current_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-    header['DATE-PRO'] = current_time
-    if 'DATE' not in header:
-        header['DATE'] = current_time
-
-    # Add input parameters to the header
-    header['CMAPSIZE'] = cmap_size  # Add cmap size
-    header['WLSMOOTH'] = wavelength_smooth  # Add wavelength smoothing factor
-    header['WL_BIN'] = wavelength_bin
-    header['NSINGUL'] = Nsingular  # Add number of singular values
-
-    # Définir le chemin complet du sous-dossier "output/wave"
-    if folder.endswith("*fits"):
-        folder = folder[:-5]
-    output_dir = os.path.join(folder,"couplingmaps")
-
-    #if os.path.exists(output_dir) and os.path.isdir(output_dir):
-    #    shutil.rmtree(output_dir)
-
-    # Créer les dossiers "output" et "pixel" s'ils n'existent pas déjà
-    os.makedirs(output_dir, exist_ok=True)
-
-    hdu_primary.header.extend(header, strip=True)
-
-    # Combine all HDUs into an HDUList
-    hdul = fits.HDUList([hdu_primary, hdu_0, hdu_1, hdu_2, hdu_3, hdu_4])
-
-    output_filename = os.path.join(output_dir, runlib.create_output_filename(header))
-
-    # Write to a FITS file
-    hdul.writeto(output_filename, overwrite=True)
-    print(f"Data saved to {output_filename}")
-
-    #fin !@!@@!@!@!@!@!@!@!@!@!@!@!@!@!@
-    # Close the HDUList
-    output_plots = output_filename[:-5]+'.pdf'
-    runlib_i.generate_plots(singular_values, chi2_delta, flux_goodData, chi2_goodData, chi2_threshold, cross_correlated_projected_data, shifted_pos_2_singular, postiptilt_2_data, output_dir)
-    print("check 1")
-    
-
-    header = fits.getheader(output_filename)
-    cmap_file=fits.open(output_filename)
-    masque=(cmap_file['MASQUE'].data) ==1
-    flux_2_data=cmap_file['F2DATA'].data
-    data_2_flux=cmap_file['DATA2F'].data
-    postiptilt_2_data=cmap_file['FTT2DATA'].data
-    data_2_postiptilt=cmap_file['DATA2FTT'].data
-    cmap_file.close()
-
-    wavelength_bin = header['WL_BIN']
-    cmap_size = header['CMAPSIZE']
-    Nmodel = postiptilt_2_data.shape[0]
-
-    datacube,datacube_var,header=runlib_i.extract_datacube(closest_dark_files,Nbin=wavelength_bin)
-
-    datacube=np.array(datacube).transpose((3,2,0,1))
-    datacube_var=np.array(datacube_var).transpose((3,2,0,1))
-
-    Nwave=datacube.shape[0]
-    Noutput=datacube.shape[1]
-    Ncube=datacube.shape[2]
-    Npos=datacube.shape[3]
-
-    modul_size = int(cmap_size)
-    dither_x, dither_y = dithering_of_image(modul_size)
-
-    # Convert arg_model values into 2D indices of size cmap_size
-    #possibly where my code breaks down
-    chi2_min,chi2_max,arg_model = get_chi2_maps(datacube,postiptilt_2_data,data_2_postiptilt)
-
-    flux_thresold=np.percentile(datacube.mean(axis=(0,1)),80)/5
-    flux_goodData=datacube.mean(axis=(0,1)) > flux_thresold
-    chi2_delta=chi2_min/chi2_max
-    percents=np.nanpercentile(chi2_delta[flux_goodData],[16,50,84])
-    chi2_threshold=percents[1]+(percents[2]-percents[0])*3/2
-    chi2_goodData = (chi2_delta < chi2_threshold)&flux_goodData
-
-    arg_model_masques = np.where(masque.ravel())[0][arg_model]
-
-    arg_model_indices = np.unravel_index(arg_model_masques, (int(cmap_size), int(cmap_size)))
-    arg_model_indices = np.array(arg_model_indices)
-    # arg_model_indices[0] -= dither_x
-    # arg_model_indices[1] -= dither_y
-
-    fig,ax=plt.subplots(3,num="Position4",clear=True,sharex=True)
-    x=np.arange(Npos)
-    for c in range(Ncube):
-        ax[0].plot(x[chi2_goodData[c]],arg_model_indices[0][c,chi2_goodData[c]],'.')
-        ax[1].plot(x[chi2_goodData[c]],arg_model_indices[1][c,chi2_goodData[c]],'.')
-        ax[2].plot(x[chi2_goodData[c]],chi2_delta[c,chi2_goodData[c]],'.-')
-
-    ax[0].plot(dither_x)
-    ax[1].plot(dither_y)
-
-    ax[2].set_yscale('log')
-
-
-    residual = datacube.copy()
-    fft_fit = np.zeros((Nwave,3,Ncube,Npos))
-    for c in range(Ncube):
-        for p in range(Npos):
-            i = arg_model[c,p]
-            fft = np.matmul(data_2_postiptilt[i],datacube[:,:,c,p,None])
-            fft_fit[:,:,c,p] = fft[:,:,0]
-            residual[:,:,c,p] -= np.matmul(postiptilt_2_data[i],fft)[:,:,0]
-
-    datacube_cleaned = datacube.copy()
-    datacube_cleaned[:,:,~chi2_goodData]=0
-    residual[:,:,~chi2_goodData]=0
-
-    image = np.matmul(data_2_flux, datacube_cleaned.reshape((Nwave,Noutput,Ncube*Npos)))
-    image = image.reshape((Nwave,Nmodel,Ncube,Npos)).transpose((3,1,2,0))
-    image_2d= runlib_i.resize_and_shift(image,masque, dither_x, dither_y).sum(axis=0)
-    images_broad=image_2d.sum(axis=3).transpose((2,0,1))
-
-    image_residual = np.matmul(data_2_flux, residual.reshape((Nwave,Noutput,Ncube*Npos)))
-    image_residual = image_residual.reshape((Nwave,Nmodel,Ncube,Npos)).transpose((3,1,2,0))
-    residual_2d= runlib_i.resize_and_shift(image_residual,masque, dither_x, dither_y).sum(axis=0)
-    residual_broad=residual_2d.sum(axis=3).transpose((2,0,1))
-
-
-    image_2d_T = image_2d.transpose(3, 2, 0,1)
-    quick_fits(image_2d_T, "transposed")
-
-    residual_2d_T = residual_2d.transpose(3, 2, 0,1)
-    quick_fits(residual_2d_T, "transposed residual")
-
-
-
-    # Plot all the images in a single figure
-
-    fig, axes = plt.subplots(2, len(images_broad), figsize=(15, 6), squeeze=False)
-
-    # Normalize color scale across all images
-    vmin = 0
-    vmax = max(images_broad.max(), residual_broad.max())/10
-
-    # Plot images_broad in the first row
-    for i, img in enumerate(images_broad):
-        #i is the image number, img is the image 49x49
-        ax = axes[0, i]
-        im = ax.imshow(img, vmin=vmin, vmax=vmax, cmap='viridis')
-        ax.set_title(f"{files_names[i].replace(".fits", "")}", fontsize=5)
-        #ax.set_title(f"Image {i+1}")
-        ax.axis('off')
-
-    axes[0, 0].set_ylabel("Images", fontsize=12, rotation=0, labelpad=40, va='center')
-
-    # Plot residual_broad in the second row
-    for i, res in enumerate(residual_broad):
-        ax = axes[1, i]
-        im = ax.imshow(res, vmin=vmin, vmax=vmax, cmap='viridis')
-        ax.set_title(f"{files_names[i].replace(".fits", "")}", fontsize=5)
-        #ax.set_title(f"Residual {i+1}")
-        ax.axis('off')
-
-    axes[1, 0].set_ylabel("Residuals", fontsize=12, rotation=0, labelpad=40, va='center')
-    # Add a colorbar
-    # fig.colorbar(im, ax=axes, orientation='vertical', fraction=0.02, pad=0.04)
-
-    plt.tight_layout()
-    plt.show()
-
-    #with all plots, to comapre w half one
-    runlib_i.generate_plots(singular_values, chi2_delta, flux_goodData, chi2_goodData, chi2_threshold, cross_correlated_projected_data, shifted_pos_2_singular, postiptilt_2_data, output_dir)
-    
-
 
 
 def interpolate_halpha(data_2_postiptilt, postiptilt_2_data, pix_to_waves=""):
@@ -774,10 +505,22 @@ if __name__ == "__main__":
     parser = OptionParser(usage)
 
 
+    default_folder ="."
+
+    # Add options for these values
+    parser.add_option("--pixel_map", type="string", default=default_folder,
+                    help="Force to select which pixel map file to use (default: the one in the directory)")
+
+    (options, args) = parser.parse_args()
+
+    file_patterns=args if args else ['*.fits']
+
+    filelist=runlib.get_filelist( file_patterns )
+    filelist_pixelmap=runlib.get_filelist( options.pixel_map )
+
+
     # Default values
     cmap_size = 25
-    wavelength_smooth = 20
-    wavelength_bin = 15
     interpolation_factor = 10
     make_movie = False
     Nsingular=19*3 #for cmap=7, 57 is too high (34, 19 for plots is max for novemeber data in cmap=7)
@@ -818,6 +561,7 @@ if __name__ == "__main__":
         file_patterns=args if args else ['*.fits']
 
     filelist = runlib.get_all_fits_files(file_patterns)
+    filelist_couplingmap = runlib.get_filelist(filelist, 'DATA-CAT', 'COUPLINGMAP')
     #filelist=runlib.get_filelist( file_patterns )
     closest_dark_files = filter_filelist(filelist,cmap_size)
 
@@ -841,150 +585,13 @@ if __name__ == "__main__":
     except:
         pass
     
-    importAllAgain = True
-    if importAllAgain :
         #Input preproc
         #clean and sum all data
         datacube,datacube_var,header=runlib_i.extract_datacube(closest_dark_files,wavelength_smooth,Nbin=wavelength_bin)
         #datacube (625, 38, 100)
         quick_fits(datacube, 'datacube')
 
-        datacube=np.array(datacube).transpose((3,2,0,1))
-        datacube_var=np.array(datacube_var).transpose((3,2,0,1))
-
-        Nwave=datacube.shape[0]
-        Noutput=datacube.shape[1]
-        Ncube=datacube.shape[2]
-        Npos=datacube.shape[3]
-
-        Movie=False
-        if Movie:
-            runlib_i.create_movie_cross(datacube)
-
-            if False:
-                plt.close('all')
-
-
-        # select data only above a threshold based on flux
-        flux_thresold=np.percentile(datacube.mean(axis=(0,1)),80)/5
-        
-
-        flux_goodData=datacube.mean(axis=(0,1)) > flux_thresold
-
-        # get the Nsingulat highest singular values and the projection vectors into that space 
-        #VSD
-        pos_2_singular,singular_values,singular_2_data=get_projection_matrice(datacube,flux_goodData,Nsingular)
-        # pos_2_singular (57, 625, 1)
-        quick_fits(pos_2_singular, "pos_2_singular")
-        quick_fits(singular_values, "singular_values")
-        quick_fits(singular_2_data, "singular_2_data")
-
-        # cross correlate the dataset to see if there is a significant offset between the different datasets
-        dist_2d_x,dist_2d_y,cross_correlated_projected_data = get_shift_between_image(pos_2_singular)
-
-        # shift and average all the datacubes, do not includes the bad frames
-        pos_2_singular[:,~flux_goodData]=np.nan
-        pos_2_singular_mean,shifted_pos_2_singular = shift_and_add(pos_2_singular, dist_2d_x, dist_2d_y)
-
-        # compute the matrices to go from the projected data to the flux and tip tilt (and inverse)
-        postiptilt_2_data,data_2_postiptilt,postiptilt_masque = get_postiptilt_model(pos_2_singular_mean,singular_2_data)
-        quick_fits(postiptilt_2_data, "postiptilt_2_data")
-        quick_fits(data_2_postiptilt, "data_2_postiptilt")
-
-        #use datamodel to check if the observations are point like
-        # To do so, fits the vector model and check if the chi2 decrease resonably
-        chi2_min,chi2_max,arg_model=get_chi2_maps(datacube,postiptilt_2_data,data_2_postiptilt)
-        chi2_delta=chi2_min/chi2_max
-        percents=np.nanpercentile(chi2_delta[flux_goodData],[16,50,84])
-        chi2_threshold=percents[1]+(percents[2]-percents[0])*3/2
-
-
-        chi2_goodData = (chi2_delta < chi2_threshold)&flux_goodData
-
-
-        #redo most of the work above but with flagged datasets
-        pos_2_singular,singular_values,singular_2_data=get_projection_matrice(datacube,chi2_goodData,Nsingular)
-        quick_fits(pos_2_singular, "pos_2_singular_2")
-        quick_fits(singular_2_data, "singular_2_data_2")
-        quick_fits(singular_values, "singular_values_2")
-        dist_2d_x,dist_2d_y,cross_correlated_projected_data = get_shift_between_image(pos_2_singular)
-        pos_2_singular[:,~chi2_goodData]=np.nan
-        pos_2_singular_mean,shifted_pos_2_singular = shift_and_add(pos_2_singular, dist_2d_x, dist_2d_y)
-        postiptilt_2_data,data_2_postiptilt,postiptilt_masque = get_postiptilt_model(pos_2_singular_mean,singular_2_data)
-        quick_fits(postiptilt_2_data, "postiptilt_2_data_post_chi2")
-        quick_fits(data_2_postiptilt, "data_2_postiptilt_post_chi2")
-        flux_2_data,data_2_flux = get_flux_model(postiptilt_2_data)
-
-        #### test
-        flux_2_data,data_2_flux = get_flux_tip_tilt_model(postiptilt_2_data, 0)
-        ##### end test
-
-        quick_fits(flux_2_data, "flux_2_data")
-        # Save arrays into a FITS file
-
-
-        output_filename = "output_data.fits"
-
-        # Create a primary HDU with no data, just the header
-        hdu_primary = fits.PrimaryHDU()
-
-        # Create HDUs for each array
-        hdu_0 = fits.ImageHDU(data=postiptilt_masque.astype(np.uint8), name='MASQUE')  # Save masque as uint8 to save space
-        hdu_1 = fits.ImageHDU(data=flux_2_data, name='F2DATA')
-        hdu_2 = fits.ImageHDU(data=data_2_flux, name='DATA2F')
-        hdu_3 = fits.ImageHDU(data=postiptilt_2_data, name='FTT2DATA')
-        hdu_4 = fits.ImageHDU(data=data_2_postiptilt, name='DATA2FTT')
-
-        header['DATA-CAT'] = 'COUPLINGMAP'
-        # Add date and time to the header
-        current_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-        header['DATE-PRO'] = current_time
-        if 'DATE' not in header:
-            header['DATE'] = current_time
-
-        # Add input parameters to the header
-        header['CMAPSIZE'] = cmap_size  # Add cmap size
-        header['WLSMOOTH'] = wavelength_smooth  # Add wavelength smoothing factor
-        header['WL_BIN'] = wavelength_bin
-        header['NSINGUL'] = Nsingular  # Add number of singular values
-
-        # Définir le chemin complet du sous-dossier "output/wave"
-        if folder.endswith("*fits"):
-            folder = folder[:-5]
-        output_dir = os.path.join(folder,"couplingmaps")
-
-        if os.path.exists(output_dir) and os.path.isdir(output_dir):
-            shutil.rmtree(output_dir)
-
-        # Créer les dossiers "output" et "pixel" s'ils n'existent pas déjà
-        os.makedirs(output_dir, exist_ok=True)
-
-        hdu_primary.header.extend(header, strip=True)
-
-        # Combine all HDUs into an HDUList
-        hdul = fits.HDUList([hdu_primary, hdu_0, hdu_1, hdu_2, hdu_3, hdu_4])
-
-        output_filename = os.path.join(output_dir, runlib.create_output_filename(header))
-
-        # Write to a FITS file
-        hdul.writeto(output_filename, overwrite=True)
-        print(f"Data saved to {output_filename}")
-
-        output_plots = output_filename[:-5]+'.pdf'
-        runlib_i.generate_plots(singular_values, chi2_delta, flux_goodData, chi2_goodData, chi2_threshold, cross_correlated_projected_data, shifted_pos_2_singular, postiptilt_2_data, output_dir)
-        print("check 1")
-
-#fin du code
-
-    #%%
-
-    
-    newfiles=False
-    if newfiles:
-        cmap_size=7
-        newdata = "/home/jsarrazin/Bureau/PLDATA/selection_prises_15_mars"
-        filelist = runlib.get_all_fits_files(newdata)
-        closest_dark_files = filter_filelist(filelist,cmap_size)
+    # output_filename is coupling map file
 
     cmap_file=fits.open(output_filename)
     header = cmap_file[0].header
