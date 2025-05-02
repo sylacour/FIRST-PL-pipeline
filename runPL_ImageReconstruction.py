@@ -672,8 +672,8 @@ if __name__ == "__main__":
 
 
     # Create a primary HDU with no data, just the header
-    hdu_primary = fits.PrimaryHDU(image_2d)
-    hdu_residual = fits.ImageHDU(residual_2d, name="RESIDUAL")
+    hdu_primary = fits.PrimaryHDU(image_2d.T)
+    hdu_residual = fits.ImageHDU(residual_2d.T, name="RESIDUAL")
 
     header['DATA-CAT'] = 'IMAGE'
     # Add date and time to the header
@@ -685,7 +685,7 @@ if __name__ == "__main__":
 
     # Définir le chemin complet du sous-dossier "output/couplingmaps"
     folder = os.path.dirname(filelist_cmap[0])
-    output_dir = os.path.join(folder,"couplingmaps")
+    output_dir = os.path.join(folder,"images")
 
     #if os.path.exists(output_dir) and os.path.isdir(output_dir):
     #    shutil.rmtree(output_dir)
@@ -703,6 +703,21 @@ if __name__ == "__main__":
     # Write to a FITS file
     hdul.writeto(output_filename, overwrite=True)
     print(f"Images saved to {output_filename}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     #%% now just images and plots to be saved for information
