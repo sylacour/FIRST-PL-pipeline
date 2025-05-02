@@ -672,8 +672,8 @@ if __name__ == "__main__":
 
 
     # Create a primary HDU with no data, just the header
-    hdu_primary = fits.PrimaryHDU(image_2d.T)
-    hdu_residual = fits.ImageHDU(residual_2d.T, name="RESIDUAL")
+    hdu_primary = fits.PrimaryHDU(image_2d.transpose((2,3,0,1)))
+    hdu_residual = fits.ImageHDU(residual_2d.transpose((2,3,0,1)), name="RESIDUAL")
 
     header['DATA-CAT'] = 'IMAGE'
     # Add date and time to the header
