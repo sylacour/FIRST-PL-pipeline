@@ -90,6 +90,19 @@ def filter_filelist(filelist,cmap_size=25):
     if len(filelist_dark) == 0:
         raise ValueError("No good dark to substract to cmap files")
 
+    # Check if all files have the same value for header['PM_CHECK']
+    pm_check_values = set()
+    combined_filelist = []
+    combined_filelist.extend(filelist_dark)
+    combined_filelist.extend(filelist_cmap)
+    for file in combined_filelist:
+        header = fits.getheader(file)
+        pm_check_values.add(header.get('PM_CHECK', 0))
+        
+    if len(pm_check_values) > 1:
+        print("WARNING: The 'PM_CHECK' values (ie, the pixel map used to preprocess the files) \n are not consistent across all files!")
+        print(f"Found values: {pm_check_values}")
+
     # for each file in filelist_cmap find the closest dark file in filelist_dark with, by priority, first the directory in which the file is, and then by the date in the "DATE" fits keyword, and second, the directory in which the file is
 
     def find_closest_in_time_dark(cmap_file, dark_files):
@@ -357,16 +370,13 @@ def run_create_coupling_maps(files_with_dark,
                                 wavelength_smooth = 20,
                                 wavelength_bin = 15,
                                 make_movie = False,
-                                Nsingular=19*3,
-                                folder = "." ):
+                                Nsingular=19*3):
     """
     Used in lancementserie.py for global generation
     
     """
     
     plt.close("all")
-
-    files_names = [os.path.basename(file) for file in files_with_dark]
 
     #Input preproc
     #clean and sum all data
@@ -435,9 +445,6 @@ def run_create_coupling_maps(files_with_dark,
     flux_2_data,data_2_flux = get_flux_model(postiptilt_2_data)
     # Save arrays into a FITS file
 
-
-    output_filename = "output_data.fits"
-
     # Create a primary HDU with no data, just the header
     hdu_primary = fits.PrimaryHDU()
 
@@ -461,9 +468,8 @@ def run_create_coupling_maps(files_with_dark,
     header['WL_BIN'] = wavelength_bin
     header['NSINGUL'] = Nsingular  # Add number of singular values
 
-    # Définir le chemin complet du sous-dossier "output/wave"
-    if folder.endswith("*fits"):
-        folder = folder[:-5]
+    # Définir le chemin complet du sous-dossier "output/couplingmaps"
+    folder = os.path.dirname(list(files_with_dark.keys())[-1])
     output_dir = os.path.join(folder,"couplingmaps")
 
     #if os.path.exists(output_dir) and os.path.isdir(output_dir):
@@ -497,7 +503,6 @@ if __name__ == "__main__":
     wavelength_bin = 15
     make_movie = False
     Nsingular=19*3 #for cmap=7, 57 is too high (34, 19 for plots is max for novemeber data in cmap=7)
-    folder = "."  # Default to current directory
 
     # Add options for these values
     parser.add_option("--cmap_size", type="int", default=cmap_size,
@@ -562,8 +567,7 @@ if __name__ == "__main__":
                                 wavelength_smooth = wavelength_smooth,
                                 wavelength_bin = wavelength_bin,
                                 make_movie = make_movie,
-                                Nsingular=19*3,
-                                folder = "." )
+                                Nsingular=19*3)
 
 
 # %%

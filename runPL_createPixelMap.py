@@ -252,6 +252,7 @@ def save_fits_and_png(raw_image,traces_loc, header, x_found,y_found, pixel_min, 
     header['PIX_MAX'] = pixel_max
     header['PIX_WIDE'] = pixel_wide
     header['OUT_CHAN'] = output_channels
+    header['PM_CHECK'] = np.random.randint(0, 2**32, dtype=np.uint32)
 
     # Définir le chemin complet du sous-dossier "output/wave"
     if folder.endswith("*fits"):

@@ -44,7 +44,7 @@ from scipy.interpolate import interpn
 
 plt.ion()
 
-DEBUG = True
+DEBUG = False
 
 # Add options
 usage = """
@@ -63,7 +63,7 @@ usage = """
     --cmap_size: Width of cmap size, in pixels (default: 25)
 """
 
-def filter_filelist(filelist,cmap_size=25):
+def filter_filelist(filelist,coupling_map):
     """
     Filters the input file list to separate coupling map files and dark files based on FITS keywords.
     Raises an error if no valid files are found.
@@ -72,23 +72,48 @@ def filter_filelist(filelist,cmap_size=25):
 
     # Use the function to clean the filelist
     fits_keywords = {'DATA-CAT': ['PREPROC'],
-                    'DATA-TYP': ['OBJECT'],
-                    'NAXIS3': [cmap_size*cmap_size]}
-    filelist_cmap = runlib.clean_filelist(fits_keywords, filelist)
-    print("runPL cmap filelist : ", filelist_cmap)
+                    'DATA-TYP': ['OBJECT']}
+    filelist_data = runlib.clean_filelist(fits_keywords, filelist)
+    print("runPL object filelist : ", filelist_data)
 
     fits_keywords = {'DATA-CAT': ['PREPROC'],
                     'DATA-TYP': ['DARK']}
     filelist_dark = runlib.clean_filelist(fits_keywords, filelist)
     print("runPL dark filelist : ", filelist_dark)
 
+    fits_keywords = {'DATA-CAT': ['COUPLINGMAP']}
+
+    filelist_cmap = runlib.clean_filelist(fits_keywords, coupling_map)
+    print("runPL object filelist : ", filelist_cmap)
 
     # raise an error if filelist_cleaned is empty
-    if len(filelist_cmap) == 0:
-        raise ValueError("No good file to run cmap")
+    if len(filelist_data) == 0:
+        raise ValueError("No good file to process")
     # raise an error if filelist_cleaned is empty
     if len(filelist_dark) == 0:
         raise ValueError("No good dark to substract to cmap files")
+
+    # raise an error if filelist_cleaned is empty
+    if len(filelist_cmap) == 0:
+        raise ValueError("No coupling map to use.\n Please specify which one to use with the option --coupling_map")
+
+    # raise an error if filelist_cleaned is more than one
+    if len(filelist_cmap) > 1:
+        raise ValueError("Two coupling maps to use! I can only use one.\n Please specify which one to use with the option --coupling_map")
+
+    # Check if all files have the same value for header['PM_CHECK']
+    pm_check_values = set()
+    combined_filelist = []
+    combined_filelist.extend(filelist_data)
+    combined_filelist.extend(filelist_dark)
+    combined_filelist.extend(filelist_cmap)
+    for file in combined_filelist:
+        header = fits.getheader(file)
+        pm_check_values.add(int(header.get('PM_CHECK', 0)))
+        
+    if len(pm_check_values) > 1:
+        print("WARNING: The 'PM_CHECK' values (ie, the pixel map used to preprocess the files) \n are not consistent across all files!")
+        print(f"Found values: {pm_check_values}")
 
     # for each file in filelist_cmap find the closest dark file in filelist_dark with, by priority, first the directory in which the file is, and then by the date in the "DATE" fits keyword, and second, the directory in which the file is
 
@@ -120,9 +145,9 @@ def filter_filelist(filelist,cmap_size=25):
         else:
             return find_closest_in_time_dark(cmap_file, dark_files) 
 
-    closest_dark_files = {cmap: find_closest_dark(cmap, filelist_dark) for cmap in filelist_cmap}
+    files_with_dark = {cmap: find_closest_dark(cmap, filelist_dark) for cmap in filelist_data}
 
-    return closest_dark_files
+    return files_with_dark,filelist_cmap
 
 
 def dithering_of_image(cmap_size, step_size=1):
@@ -351,7 +376,8 @@ def quick_fits(data, title=""):
         #For debugging purpose
         now = datetime.now()
         date_time_str = now.strftime("%Y_%m_%d_%H_%M_%S")
-        runlib.save_fits_file(data, "/home/jsarrazin/Bureau/test zone/coupling_maps/"+title+"_"+date_time_str+".fits")
+        if getpass.getuser() == "jsarrazin":
+            runlib.save_fits_file(data, "/home/jsarrazin/Bureau/test zone/coupling_maps/"+title+"_"+date_time_str+".fits")
         print("Done")
 
 def quick_imshow(data, title=""):
@@ -504,96 +530,36 @@ def interpolate_halpha(data_2_postiptilt, postiptilt_2_data, pix_to_waves=""):
 if __name__ == "__main__":
     parser = OptionParser(usage)
 
-
-    default_folder ="."
-
-    # Add options for these values
-    parser.add_option("--pixel_map", type="string", default=default_folder,
-                    help="Force to select which pixel map file to use (default: the one in the directory)")
-
-    (options, args) = parser.parse_args()
-
-    file_patterns=args if args else ['*.fits']
-
-    filelist=runlib.get_filelist( file_patterns )
-    filelist_pixelmap=runlib.get_filelist( options.pixel_map )
-
-
-    # Default values
-    cmap_size = 25
-    interpolation_factor = 10
-    make_movie = False
-    Nsingular=19*3 #for cmap=7, 57 is too high (34, 19 for plots is max for novemeber data in cmap=7)
-    folder = "."  # Default to current directory
+    wavelength_smooth = 1
 
     # Add options for these values
-    parser.add_option("--cmap_size", type="int", default=cmap_size,
-                    help="step numbers of modulation (default: %default)")
-    parser.add_option("--Nsingular", type="int", default=Nsingular,
-                      help="Number of singular values to use (default: %default)")
+    parser.add_option("--coupling_map", type="string", default=None,
+                    help="Force to select which coupling map file to use (default: the one in the directory)")
     parser.add_option("--wavelength_smooth", type="int", default=wavelength_smooth,
                     help="smoothing factor for wavelength (default: %default)")
-    parser.add_option("--wavelength_bin", type="int", default=wavelength_smooth,
-                    help="binning factor for wavelength (default: %default)")
-    parser.add_option("--interpolation_factor", type="int", default=interpolation_factor,
-                    help="Interpolation of data between modulation steps (default: %default)")
-    parser.add_option("--make_movie", action="store_true", default=make_movie,
-                    help="Create a nice mp4 with all datacubes -- can be long (default: %default)")
-    
-    if "VSCODE_PID" in os.environ or os.environ.get('TERM_PROGRAM') == 'vscode':
-        file_patterns = "/Users/slacour/DATA/LANTERNE/Optim_maps/November2024/preproc"
-        file_patterns = "/home/jsarrazin/Bureau/PLDATA/moreTest/2024-11-21_13-48-32_science_copie/preproc"
-        file_patterns = "/home/jsarrazin/Bureau/PLDATA/novembre/les_preproc"
-        #file_patterns = "/home/jsarrazin/Bureau/PLDATA/2025_03_14"
-        #file_patterns = "/home/jsarrazin/Bureau/PLDATA/selection_prises_15_mars"
-        cmap_size = 25
-    else:
-        # Parse the options
-        (options, args) = parser.parse_args()
 
-        # Pass the parsed options to the function
-        cmap_size=options.cmap_size
-        Nsingular=options.Nsingular
-        wavelength_smooth=options.interpolation_factor
-        #interpolation_factor=options.pixel_wide
-        make_movie=options.make_movie
-        wavelength_bin=options.wavelength_bin
+    if "VSCODE_PID" in os.environ or os.environ.get('TERM_PROGRAM') == 'vscode':
+        if getpass.getuser() == "slacour":
+            file_patterns = "/Users/slacour/DATA/LANTERNE/Optim_maps/November2024/preproc"
+            coupling_map = file_patterns+"/couplingmaps/firstpl_2025-01-14T15:34:19_COUPLINGMAP.fits"
+    else:
+
+        (options, args) = parser.parse_args()
         file_patterns=args if args else ['*.fits']
 
-    filelist = runlib.get_all_fits_files(file_patterns)
-    filelist_couplingmap = runlib.get_filelist(filelist, 'DATA-CAT', 'COUPLINGMAP')
-    #filelist=runlib.get_filelist( file_patterns )
-    closest_dark_files = filter_filelist(filelist,cmap_size)
+        wavelength_smooth=options.wavelength_smooth
+        # If the user specifies a coupling map, use it, otherwise look into the arguments
+        coupling_map = options.coupling_map
+        if coupling_map is None:
+            coupling_map = file_patterns
 
-    try:
-        closest_dark_files.pop('/Users/slacour/DATA/LANTERNE/Optim_maps/November2024/preproc/firstpl_2025-01-14T15:34:08_NONAME.fits')
 
-        for _ in range(7):
-            closest_dark_files.pop(next(iter(closest_dark_files)))
+    filelist=runlib.get_filelist( file_patterns )
+    filelist_pixelmap=runlib.get_filelist(coupling_map)
 
-        # closest_dark_files.pop(next(reversed(closest_dark_files)))
-        # closest_dark_files.pop(next(reversed(closest_dark_files)))
-        # closest_dark_files.pop(next(reversed(closest_dark_files)))
-    except:
-        pass
+    files_with_dark,filelist_cmap = filter_filelist(filelist,filelist_pixelmap)
 
-    try:
-        closest_dark_files.pop('/Users/slacour/DATA/LANTERNE/Optim_maps/May2024/preproc/firstpl_2025-02-19T11:25:12_NONAME.fits')
-        closest_dark_files.pop('/Users/slacour/DATA/LANTERNE/Optim_maps/May2024/preproc/firstpl_2025-02-19T11:25:13_NONAME.fits')
-        closest_dark_files.pop('/Users/slacour/DATA/LANTERNE/Optim_maps/May2024/preproc/firstpl_2025-02-19T11:25:14_NONAME.fits')
-        closest_dark_files.pop('/Users/slacour/DATA/LANTERNE/Optim_maps/May2024/preproc/firstpl_2025-02-19T11:25:15_NONAME.fits')
-    except:
-        pass
-    
-        #Input preproc
-        #clean and sum all data
-        datacube,datacube_var,header=runlib_i.extract_datacube(closest_dark_files,wavelength_smooth,Nbin=wavelength_bin)
-        #datacube (625, 38, 100)
-        quick_fits(datacube, 'datacube')
-
-    # output_filename is coupling map file
-
-    cmap_file=fits.open(output_filename)
+    cmap_file=fits.open(filelist_cmap[0])
     header = cmap_file[0].header
     masque=(cmap_file['MASQUE'].data) ==1
     flux_2_data=cmap_file['F2DATA'].data
@@ -603,11 +569,38 @@ if __name__ == "__main__":
     cmap_file.close()
 
     wavelength_bin = header['WL_BIN']
-    cmap_size = header['CMAPSIZE']
     Nmodel = postiptilt_2_data.shape[0]
 
-    datacube,datacube_var,header=runlib_i.extract_datacube(closest_dark_files,Nbin=wavelength_bin)
 
+
+    try:
+        files_with_dark.pop('/Users/slacour/DATA/LANTERNE/Optim_maps/November2024/preproc/firstpl_2025-01-14T15:34:08_NONAME.fits')
+
+        for _ in range(7):
+            files_with_dark.pop(next(iter(files_with_dark)))
+
+        # closest_dark_files.pop(next(reversed(closest_dark_files)))
+        # closest_dark_files.pop(next(reversed(closest_dark_files)))
+        # closest_dark_files.pop(next(reversed(closest_dark_files)))
+    except:
+        pass
+
+
+    # to be reaplaced by the real values
+    dither_x, dither_y = dithering_of_image(25)
+    Npos = 625 # number of positions in the dithering patterm
+
+
+    #Input preproc
+    #clean and sum all data
+    datacube,datacube_var,header=runlib_i.extract_datacube(files_with_dark,wavelength_smooth,Nbin=wavelength_bin)
+    #datacube (625, 38, 100)
+    quick_fits(datacube, 'datacube')
+
+    datacube = [d for d in datacube if len(d) == Npos]
+    datacube_var = [d for d in datacube_var if len(d) == Npos]
+
+    # output_filename is coupling map file
     datacube=np.array(datacube).transpose((3,2,0,1))
     datacube_var=np.array(datacube_var).transpose((3,2,0,1))
 
@@ -616,8 +609,6 @@ if __name__ == "__main__":
     Ncube=datacube.shape[2]
     Npos=datacube.shape[3]
 
-    modul_size = cmap_size
-    dither_x, dither_y = dithering_of_image(modul_size)
 
     # Convert arg_model values into 2D indices of size cmap_size
     chi2_min,chi2_max,arg_model = get_chi2_maps(datacube,postiptilt_2_data,data_2_postiptilt)
@@ -633,10 +624,8 @@ if __name__ == "__main__":
 
     arg_model_masques = np.where(masque.ravel())[0][arg_model]
 
-    arg_model_indices = np.unravel_index(arg_model_masques, (cmap_size, cmap_size))
+    arg_model_indices = np.unravel_index(arg_model_masques, (len(masque), len(masque[0])))
     arg_model_indices = np.array(arg_model_indices)
-    # arg_model_indices[0] -= dither_x
-    # arg_model_indices[1] -= dither_y
 
     fig,ax=plt.subplots(3,num="Position4",clear=True,sharex=True)
     x=np.arange(Npos)
@@ -655,8 +644,6 @@ if __name__ == "__main__":
     ax[1].set_title("Position on y")
     ax[2].legend()
     ax[2].set_title("Chi2_delta good data")
-
-    #%%
 
     residual = datacube.copy()
     fft_fit = np.zeros((Nwave,3,Ncube,Npos))
@@ -681,7 +668,44 @@ if __name__ == "__main__":
     residual_2d= runlib_i.resize_and_shift(image_residual,masque, dither_x, dither_y).sum(axis=0)
     residual_broad=residual_2d.sum(axis=3).transpose((2,0,1))
 
+    # Save image_2d and residual_2d to a FITS file
 
+
+    # Create a primary HDU with no data, just the header
+    hdu_primary = fits.PrimaryHDU(image_2d)
+    hdu_residual = fits.ImageHDU(residual_2d, name="RESIDUAL")
+
+    header['DATA-CAT'] = 'IMAGE'
+    # Add date and time to the header
+    current_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+    header['DATE-PRO'] = current_time
+
+    # Add input parameters to the header
+    header['WLSMOOTH'] = wavelength_smooth  # Add wavelength smoothing factor
+
+    # Définir le chemin complet du sous-dossier "output/couplingmaps"
+    folder = os.path.dirname(filelist_cmap[0])
+    output_dir = os.path.join(folder,"couplingmaps")
+
+    #if os.path.exists(output_dir) and os.path.isdir(output_dir):
+    #    shutil.rmtree(output_dir)
+
+    # Créer les dossiers "output" et "pixel" s'ils n'existent pas déjà
+    os.makedirs(output_dir, exist_ok=True)
+
+    hdu_primary.header.extend(header, strip=True)
+
+    # Combine all HDUs into an HDUList
+    hdul = fits.HDUList([hdu_primary, hdu_residual])
+
+    output_filename = os.path.join(output_dir, runlib.create_output_filename(header))
+
+    # Write to a FITS file
+    hdul.writeto(output_filename, overwrite=True)
+    print(f"Images saved to {output_filename}")
+
+
+    #%% now just images and plots to be saved for information
 
     image_2d_T = image_2d.transpose(3, 2, 0,1)
     quick_fits(image_2d_T, "transposed")
@@ -778,9 +802,5 @@ if __name__ == "__main__":
     plt.tight_layout()
     plt.show()
 
-    runlib_i.save_all_as_PDF()
-
-
-    # %%
-
+    runlib_i.save_all_as_PDF(output_dir = output_dir)
 

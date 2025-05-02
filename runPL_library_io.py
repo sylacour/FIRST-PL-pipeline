@@ -18,6 +18,8 @@ import re
 
 def clean_filelist(fits_keywords, filelist, verbose=False):
     filelist_cleaned = []
+    if isinstance(filelist, str):
+        filelist = [filelist]
     for filename in filelist:
         if verbose:
             print(("Check file: " + filename))
@@ -51,6 +53,13 @@ def clean_filelist(fits_keywords, filelist, verbose=False):
 
         filelist_cleaned.append(filename)
     
+    filelist_cleaned = np.array(filelist_cleaned)
+    if len(filelist_cleaned) == 0:
+        print("No file found with the correct keywords")
+    
+    # Remove duplicate values
+    filelist_cleaned = np.unique(filelist_cleaned)
+
     return np.sort(filelist_cleaned)
 
 
