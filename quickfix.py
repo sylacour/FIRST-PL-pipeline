@@ -5,7 +5,7 @@ from glob import glob
 
 from runPL_createPixelMap import run_createPixelMap
 from runPL_preprocess import preprocess
-import runPL_library as runlib
+import runPL_library_io as runlib
 import numpy as np
 import matplotlib
 matplotlib.use('TkAgg') 

@@ -531,8 +531,9 @@ if __name__ == "__main__":
         wavelength_bin=options.wavelength_bin
         file_patterns=args if args else ['*.fits']
 
-    filelist = runlib.get_all_fits_files(file_patterns)
-    #filelist=runlib.get_filelist( file_patterns )
+    print(file_patterns)
+    filelist = runlib.get_filelist(file_patterns)
+    print(filelist)
     closest_dark_files = filter_filelist(filelist,cmap_size)
 
     try:

@@ -5,7 +5,7 @@ import shutil
 import sys
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(parent_dir)
-import runPL_library as runlib
+import runPL_library_io as runlib
 from runPL_createPixelMap import run_createPixelMap, save_fits_and_png
 from runPL_preprocess import run_preprocess
 from runPL_createWavelengthMap import runCreateWavelengthMap

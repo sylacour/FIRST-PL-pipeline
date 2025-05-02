@@ -233,9 +233,8 @@ if __name__ == "__main__":
 
     filelist=runlib.get_filelist( file_patterns )
     filelist_pixelmap=runlib.get_filelist( options.pixel_map )
-
-
     filelist_pixelmap,files_by_dir = filter_filelist(filelist , filelist_pixelmap)
+
     preprocess(filelist_pixelmap,files_by_dir)
 
 # %%

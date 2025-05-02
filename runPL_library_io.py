@@ -238,23 +238,6 @@ def get_latest_date_fits(fits_files):
     
     return latest_file
 
-def get_all_fits_files(folder):
-    """
-    Recursively finds all FITS files in a given folder and its subfolders.
-
-    Parameters:
-        folder (str): The path to the folder to search.
-
-    Returns:
-        list: A list of paths to all FITS files in the folder and its subfolders.
-    """
-    fits_files = []
-    for root, _, files in os.walk(folder):
-        for file in files:
-            if file.lower().endswith('.fits'):
-                fits_files.append(os.path.join(root, file))
-    return fits_files
-
 def update_anything_in_fits(file_path, header, header_value):
     # Update the chosen keyword 
     with fits.open(file_path, mode='update') as hdul:
