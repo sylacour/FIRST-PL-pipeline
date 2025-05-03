@@ -541,7 +541,7 @@ if __name__ == "__main__":
     if "VSCODE_PID" in os.environ or os.environ.get('TERM_PROGRAM') == 'vscode':
         if getpass.getuser() == "slacour":
             file_patterns = "/Users/slacour/DATA/LANTERNE/Optim_maps/November2024/preproc"
-            coupling_map = file_patterns+"/couplingmaps/firstpl_2025-01-14T15:34:19_COUPLINGMAP.fits"
+            coupling_map = file_patterns+"/couplingmaps/"
     else:
 
         (options, args) = parser.parse_args()
@@ -593,22 +593,20 @@ if __name__ == "__main__":
 
     #Input preproc
     #clean and sum all data
-    datacube,datacube_var,header=runlib_i.extract_datacube(files_with_dark,wavelength_smooth,Nbin=wavelength_bin)
+    datalist=runlib_i.extract_datacube(files_with_dark,wavelength_smooth,Nbin=wavelength_bin)
+    datalist = [d for d in datalist if d.Npos == Npos]
+
+    datacube=[d.data for d in datalist]
     #datacube (625, 38, 100)
     quick_fits(datacube, 'datacube')
 
-    datacube = [d for d in datacube if len(d) == Npos]
-    datacube_var = [d for d in datacube_var if len(d) == Npos]
-
     # output_filename is coupling map file
     datacube=np.array(datacube).transpose((3,2,0,1))
-    datacube_var=np.array(datacube_var).transpose((3,2,0,1))
 
-    Nwave=datacube.shape[0]
-    Noutput=datacube.shape[1]
-    Ncube=datacube.shape[2]
-    Npos=datacube.shape[3]
-
+    Nwave=datalist[0].Nwave
+    Noutput=datalist[0].Noutput
+    Ncube=len(datalist)
+    Npos=datalist[0].Npos
 
     # Convert arg_model values into 2D indices of size cmap_size
     chi2_min,chi2_max,arg_model = get_chi2_maps(datacube,postiptilt_2_data,data_2_postiptilt)
@@ -670,39 +668,41 @@ if __name__ == "__main__":
 
     # Save image_2d and residual_2d to a FITS file
 
+    for i,d in enumerate(datalist):
+        header = d.header
 
-    # Create a primary HDU with no data, just the header
-    hdu_primary = fits.PrimaryHDU(image_2d.transpose((2,3,0,1)))
-    hdu_residual = fits.ImageHDU(residual_2d.transpose((2,3,0,1)), name="RESIDUAL")
 
-    header['DATA-CAT'] = 'IMAGE'
-    # Add date and time to the header
-    current_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
-    header['DATE-PRO'] = current_time
+        # Create a primary HDU with no data, just the header
+        hdu_primary = fits.PrimaryHDU(image_2d[:,:,i].transpose((2,0,1)))
+        hdu_residual = fits.ImageHDU(residual_2d[:,:,i].transpose((2,0,1)), name="RESIDUAL")
 
-    # Add input parameters to the header
-    header['WLSMOOTH'] = wavelength_smooth  # Add wavelength smoothing factor
+        header['DATA-CAT'] = 'IMAGE'
+        # Add date and time to the header
+        current_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
+        header['DATE-PRO'] = current_time
 
-    # Définir le chemin complet du sous-dossier "output/couplingmaps"
-    folder = os.path.dirname(filelist_cmap[0])
-    output_dir = os.path.join(folder,"images")
+        # Add input parameters to the header
+        header['WLSMOOTH'] = wavelength_smooth  # Add wavelength smoothing factor
 
-    #if os.path.exists(output_dir) and os.path.isdir(output_dir):
-    #    shutil.rmtree(output_dir)
+        # Définir le chemin complet du sous-dossier "images"
+        output_dir = os.path.join(d.dirname,"images")
 
-    # Créer les dossiers "output" et "pixel" s'ils n'existent pas déjà
-    os.makedirs(output_dir, exist_ok=True)
+        #if os.path.exists(output_dir) and os.path.isdir(output_dir):
+        #    shutil.rmtree(output_dir)
 
-    hdu_primary.header.extend(header, strip=True)
+        # Créer les dossiers "output" et "pixel" s'ils n'existent pas déjà
+        os.makedirs(output_dir, exist_ok=True)
 
-    # Combine all HDUs into an HDUList
-    hdul = fits.HDUList([hdu_primary, hdu_residual])
+        hdu_primary.header.extend(header, strip=True)
 
-    output_filename = os.path.join(output_dir, runlib.create_output_filename(header))
+        # Combine all HDUs into an HDUList
+        hdul = fits.HDUList([hdu_primary, hdu_residual])
 
-    # Write to a FITS file
-    hdul.writeto(output_filename, overwrite=True)
-    print(f"Images saved to {output_filename}")
+        output_filename = os.path.join(output_dir, runlib.create_output_filename(header))
+
+        # Write to a FITS file
+        hdul.writeto(output_filename, overwrite=True)
+        print(f"Image saved to {output_filename}")
 
 
 

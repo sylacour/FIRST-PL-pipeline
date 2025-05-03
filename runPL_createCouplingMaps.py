@@ -380,25 +380,17 @@ def run_create_coupling_maps(files_with_dark,
 
     #Input preproc
     #clean and sum all data
-    datacube,datacube_var,header=runlib_i.extract_datacube(files_with_dark,wavelength_smooth,Nbin=wavelength_bin)
+    datalist=runlib_i.extract_datacube(files_with_dark,wavelength_smooth,Nbin=wavelength_bin)
     #datacube (625, 38, 100)
+    datacube=[d.data for d in datalist]
     quick_fits(datacube, 'datacube')
 
     datacube=np.array(datacube).transpose((3,2,0,1))
-    datacube_var=np.array(datacube_var).transpose((3,2,0,1))
 
-    Nwave=datacube.shape[0]
-    Noutput=datacube.shape[1]
-    Ncube=datacube.shape[2]
-    Npos=datacube.shape[3]
-
-    Movie=False
-    if Movie:
+    if make_movie:
         runlib_i.create_movie_cross(datacube)
 
-        if False:
-            plt.close('all')
-
+        plt.close('all')
 
     # select data only above a threshold based on flux
     flux_thresold=np.percentile(datacube.mean(axis=(0,1)),80)/5
@@ -414,7 +406,6 @@ def run_create_coupling_maps(files_with_dark,
     #flux_gooddata : (10, 625)
     #Nsingular : 57
     pos_2_singular,singular_values,singular_2_data=get_projection_matrice(datacube,flux_goodData,Nsingular)
-
 
 
     # cross correlate the dataset to see if there is a significant offset between the different datasets
@@ -455,6 +446,11 @@ def run_create_coupling_maps(files_with_dark,
     hdu_3 = fits.ImageHDU(data=postiptilt_2_data, name='FTT2DATA')
     hdu_4 = fits.ImageHDU(data=data_2_postiptilt, name='DATA2FTT')
 
+    header = datalist[-1].header
+    # Définir le chemin complet du sous-dossier "output/couplingmaps"
+    folder = datalist[-1].dirname
+    output_dir = os.path.join(folder,"couplingmaps")
+
     header['DATA-CAT'] = 'COUPLINGMAP'
     # Add date and time to the header
     current_time = datetime.now().strftime('%Y-%m-%dT%H:%M:%S')
@@ -467,13 +463,8 @@ def run_create_coupling_maps(files_with_dark,
     header['WLSMOOTH'] = wavelength_smooth  # Add wavelength smoothing factor
     header['WL_BIN'] = wavelength_bin
     header['NSINGUL'] = Nsingular  # Add number of singular values
-
-    # Définir le chemin complet du sous-dossier "output/couplingmaps"
-    folder = os.path.dirname(list(files_with_dark.keys())[-1])
-    output_dir = os.path.join(folder,"couplingmaps")
-
-    #if os.path.exists(output_dir) and os.path.isdir(output_dir):
-    #    shutil.rmtree(output_dir)
+    header['FLUXTHR'] = flux_thresold  # Add flux threshold
+    header['CHI2THR'] = chi2_threshold  # Add chi2 threshold
 
     # Créer les dossiers "output" et "pixel" s'ils n'existent pas déjà
     os.makedirs(output_dir, exist_ok=True)
@@ -490,7 +481,6 @@ def run_create_coupling_maps(files_with_dark,
     print(f"Data saved to {output_filename}")
 
     runlib_i.generate_plots(singular_values, chi2_delta, flux_goodData, chi2_goodData, chi2_threshold, cross_correlated_projected_data, shifted_pos_2_singular, postiptilt_2_data, output_dir)
-
 
 
 if __name__ == "__main__":

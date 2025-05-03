@@ -253,6 +253,25 @@ def generate_plots(singular_values, chi2_delta, flux_goodData, chi2_goodData, ch
 
     print(f"All plots saved to {pdf_filename}")
 
+class DataCube:
+    """
+    A class to represent a data cube.
+    Attributes:
+        data (numpy.ndarray): The data cube.
+        variance (numpy.ndarray): The variance of the data cube.
+        header (astropy.io.fits.Header): The header information.
+    """
+
+    def __init__(self, data, variance, filename, header):
+        self.data = data
+        self.variance = variance
+        self.dirname = os.path.dirname(filename)
+        self.filename = filename
+        self.header = header
+        self.Npos = data.shape[0]
+        self.Noutput = data.shape[1]
+        self.Nwave = data.shape[2]
+
 
 def extract_datacube(closest_dark_files,Nsmooth = 1,Nbin = 1):
     """
@@ -263,12 +282,7 @@ def extract_datacube(closest_dark_files,Nsmooth = 1,Nbin = 1):
     If Nbin > 1, the data is binned along its wavelength dimension by Nbin values.
     """
 
-    datacube=[]
-    datacube_var=[]
-    for data_file,dark_file  in closest_dark_files.items():
-        header_tosave=fits.getheader(data_file)
-
-    file_number=1
+    datalist=[]
 
     for data_file,dark_file  in closest_dark_files.items():
         header=fits.getheader(data_file)
@@ -300,15 +314,9 @@ def extract_datacube(closest_dark_files,Nsmooth = 1,Nbin = 1):
             data=data.reshape((Npos,Noutput,Nwave//Nbin,Nbin)).sum(axis=-1)
             data_var=data_var.reshape((Npos,Noutput,Nwave//Nbin,Nbin)).sum(axis=-1)
 
-        Nwave=data.shape[2]
+        datalist += [DataCube(data, data_var, data_file, header)]
 
-        datacube+=[data]
-        datacube_var+=[data_var]
-
-        header_tosave['FILE'+str(file_number)]=os.path.basename(data_file)
-        
-
-    return datacube,datacube_var,header_tosave
+    return datalist
 
 
 def resize_and_shift(flux, masque, dither_x, dither_y):
